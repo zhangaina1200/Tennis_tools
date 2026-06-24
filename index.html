@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网球双打排阵系统</title>
+<style>
+  :root {
+    --green-dark: #1b5e20;
+    --green: #2e7d32;
+    --green-light: #4caf50;
+    --green-bg: #e8f5e9;
+    --green-pale: #f1f8e9;
+    --white: #ffffff;
+    --gray: #757575;
+    --gray-light: #e0e0e0;
+    --red: #e53935;
+    --orange: #ff8f00;
+    --blue: #1565c0;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    --radius: 8px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+    background: var(--green-bg);
+    color: #333;
+    line-height: 1.6;
+    padding: 20px;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  .header {
+    text-align: center;
+    padding: 28px 20px;
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    color: #fff;
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .header h1 { font-size: 26px; letter-spacing: 2px; }
+  .header p { font-size: 14px; opacity: .85; margin-top: 6px; }
+
+  /* Help section */
+  .help-card {
+    background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+    border: 1px solid #c8e6c9;
+    border-radius: var(--radius);
+    margin-bottom: 16px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    overflow: hidden;
+  }
+  .help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .help-header:hover { background: rgba(0,0,0,0.03); }
+  .help-header .title { font-size: 14px; font-weight: 600; color: var(--green-dark); }
+  .help-header .toggle-icon { font-size: 13px; color: var(--green); transition: transform 0.25s; }
+  .help-header .toggle-icon.open { transform: rotate(180deg); }
+  .help-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+  .help-body.open { max-height: 800px; }
+  .help-body-inner {
+    padding: 4px 18px 16px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #444;
+  }
+  .help-body-inner table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 13px; }
+  .help-body-inner td { padding: 3px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+  .help-body-inner td:first-child { white-space: nowrap; font-weight: 500; color: var(--green-dark); width: 80px; }
+  .help-body-inner .tag { display: inline-block; padding: 0 6px; border-radius: 3px; font-size: 11px; font-weight: 600; color: #fff; margin: 0 2px; }
+  .help-body-inner .tag.gr { background: var(--green); }
+  .help-body-inner .tag.bl { background: var(--blue); }
+  .help-body-inner .tag.pk { background: #e91e63; }
+  .help-body-inner .tag.or { background: var(--orange); }
+
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 18px;
+    color: var(--green);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--green-bg);
+  }
+
+  /* Player list */
+  .player-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .player-row select {
+    width: 72px;
+    padding: 8px 6px;
+    border: 1px solid var(--gray-light);
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+  }
+  .player-row input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--gray-light);
+    border-radius: 4px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .player-row input:focus { border-color: var(--green-light); }
+  .player-row .del-btn {
+    width: 32px; height: 32px;
+    border: none;
+    background: #fbe9e7;
+    color: var(--red);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 32px;
+    text-align: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .player-row .del-btn:hover { background: #ffccbc; }
+  .player-row .row-num {
+    width: 24px;
+    font-size: 12px;
+    color: var(--gray);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  .btn-add { background: var(--green-bg); color: var(--green); border: 1px dashed var(--green-light); }
+  .btn-add:hover { background: #c8e6c9; }
+  .btn-generate { background: var(--green); color: #fff; }
+  .btn-generate:hover { background: var(--green-dark); }
+  .btn-generate:disabled { background: var(--gray-light); color: var(--gray); cursor: not-allowed; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #c62828; }
+  .btn-outline { background: transparent; border: 1px solid var(--gray-light); color: var(--gray); }
+  .btn-outline:hover { border-color: var(--green); color: var(--green); }
+
+  .error-msg { display: none; padding: 12px 16px; background: #fff3e0; border-left: 4px solid var(--orange); border-radius: 4px; margin-bottom: 16px; font-size: 14px; color: #bf360c; }
+  .error-msg.show { display: block; }
+  .success-msg { display: none; padding: 12px 16px; background: #e8f5e9; border-left: 4px solid var(--green); border-radius: 4px; margin-bottom: 16px; font-size: 14px; color: #1b5e20; }
+  .success-msg.show { display: block; }
+
+  /* Constraint styles */
+  .constraint-section { margin-top: 12px; }
+  .constraint-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .constraint-tab { padding: 6px 16px; border: none; border-radius: 4px; background: var(--green-pale); color: var(--gray); cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .constraint-tab.active { background: var(--green); color: #fff; }
+  .constraint-tab:hover:not(.active) { background: #dcedc8; }
+
+  .constraint-panel { display: none; }
+  .constraint-panel.show { display: block; }
+
+  .con-row {
+    display: flex; gap: 6px; align-items: center;
+    padding: 8px 10px;
+    background: #fafafa;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .con-row select {
+    padding: 6px 8px;
+    border: 1px solid var(--gray-light);
+    border-radius: 4px;
+    font-size: 13px;
+    background: #fff;
+    min-width: 80px;
+  }
+  .con-row .con-label {
+    font-size: 13px; color: var(--gray); padding: 0 2px;
+  }
+  .con-row .con-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .con-tag.blue { background: var(--blue); }
+  .con-tag.pink { background: #e91e63; }
+  .con-tag.orange { background: var(--orange); }
+
+  .con-add-row {
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px;
+  }
+
+  .toggle-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; color: var(--gray); cursor: pointer;
+  }
+  .toggle-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--green); }
+
+  /* Tab & table */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 8px 20px; border: none; border-radius: 4px 4px 0 0;
+    background: var(--green-pale); color: var(--gray); cursor: pointer;
+    font-size: 14px; font-weight: 500; transition: all 0.2s;
+  }
+  .tab-btn:hover { background: #dcedc8; }
+  .tab-btn.active { background: var(--green); color: #fff; }
+
+  .match-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .match-table th { background: var(--green-bg); color: var(--green-dark); padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--green-light); }
+  .match-table td { padding: 10px 12px; border-bottom: 1px solid var(--gray-light); }
+  .match-table tr:hover td { background: var(--green-pale); }
+  .type-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; }
+  .type-tag.db { background: var(--blue); }
+  .type-tag.wb { background: #e91e63; }
+  .type-tag.mx { background: var(--orange); }
+
+  .constrained-match td { background: #fff8e1 !important; }
+  .constrained-match td:first-child::after { content: ' 📌'; font-size: 12px; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .stat-card { padding: 12px 14px; background: var(--green-pale); border-radius: 6px; border-left: 3px solid var(--green); }
+  .stat-card .name { font-weight: 600; color: var(--green-dark); margin-bottom: 4px; }
+  .stat-card .detail { font-size: 13px; color: #555; }
+  .stat-card .detail span { display: inline-block; background: #fff; padding: 1px 6px; margin: 1px 2px; border-radius: 3px; font-size: 12px; }
+
+  .coverage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .coverage-grid { grid-template-columns: 1fr; } }
+  .cov-box { padding: 14px 16px; border-radius: 6px; background: var(--green-pale); }
+  .cov-box h3 { font-size: 15px; margin-bottom: 8px; color: var(--green-dark); }
+  .cov-box .stat { font-size: 28px; font-weight: 700; color: var(--green); }
+  .cov-box .stat.warn { color: var(--orange); }
+  .cov-box .sub { font-size: 13px; color: var(--gray); margin-top: 2px; }
+  .cov-box .missing { margin-top: 8px; font-size: 13px; color: var(--red); }
+
+  .count-badge { display: inline-block; font-size: 13px; color: var(--gray); margin-left: 8px; }
+  #result { display: none; margin-top: 8px; }
+  #result.show { display: block; }
+  .seed-info { font-size: 12px; color: var(--gray); margin-top: 8px; font-style: italic; }
+  .relax-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .relax-badge.strict { background: #e8f5e9; color: #2e7d32; }
+  .relax-badge.relaxed { background: #fff3e0; color: #e65100; }
+  .summary-line { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 0 4px; font-size: 14px; color: var(--gray); }
+  .summary-line strong { color: #333; }
+
+  .empty-hint { text-align: center; padding: 40px 20px; color: var(--gray); }
+  .scroll-x { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>🎾 网球双打排阵</h1>
+    <p>输入选手名单，自动生成 5 轮排阵 · 支持指定对阵/组队</p>
+  </div>
+
+  <!-- Help Section -->
+  <div class="help-card" id="help-card">
+    <div class="help-header" id="help-toggle">
+      <span class="title">📖 使用说明</span>
+      <span class="toggle-icon" id="help-icon">▼</span>
+    </div>
+    <div class="help-body" id="help-body">
+      <div class="help-body-inner">
+        <table>
+          <tr><td>👥 选手</td><td>点击 <span class="tag gr">＋ 添加选手</span> 逐行输入，每行选性别 + 填姓名。可增减</td></tr>
+          <tr><td>⚙️ 指定</td><td>勾选 <strong>「启用指定」</strong> 可添加排阵约束：<br>
+            <span class="tag bl">双人</span> 选 A+B → 指定 <strong>组队</strong> 或 <strong>对阵</strong><br>
+            <span class="tag or">四人</span> 选 A+B vs C+D → 固定一场对阵<br>
+            约束不指定轮次，算法自动安排
+          </td></tr>
+          <tr><td>🎾 生成</td><td>点击 <span class="tag gr">生成排阵</span>，自动计算 5 轮赛程</td></tr>
+          <tr><td>📋 结果</td><td>切换 <strong>第1~5轮</strong> 标签查看每轮对阵。📌 标记 = 指定匹配</td></tr>
+          <tr><td>🤝 搭档</td><td>按人展示男双/女双/混双搭档及配对数</td></tr>
+          <tr><td>📊 覆盖率</td><td>展示所有男选手间及女选手间的对阵覆盖率，缺阵列表</td></tr>
+        </table>
+        <div style="margin-top:4px;font-size:12px;color:var(--gray);">
+          ⚡ 条件：男女人数均为偶数 · 总人数为4的倍数 · 每人5场 · 零重复搭档
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input Section -->
+  <div class="card">
+    <h2>选手名单 <span class="count-badge" id="count-badge"></span></h2>
+    <div id="player-list"></div>
+    <div class="btn-group">
+      <button class="btn btn-add" id="add-btn">＋ 添加选手</button>
+      <button class="btn btn-generate" id="gen-btn">🎾 生成排阵</button>
+    </div>
+  </div>
+
+  <!-- Constraint Section -->
+  <div class="card" id="constraint-section">
+    <h2>
+      ⚙️ 指定排阵
+      <label class="toggle-label" style="display:inline-flex;vertical-align:middle;margin-left:12px;font-weight:400;font-size:13px;">
+        <input type="checkbox" id="constraint-toggle"> 启用指定
+      </label>
+    </h2>
+
+    <div id="constraint-body" style="display:none;">
+      <div class="constraint-tabs">
+        <button class="constraint-tab active" data-panel="pair">双人指定</button>
+        <button class="constraint-tab" data-panel="fixed">四人指定</button>
+      </div>
+
+      <!-- Pair constraint panel -->
+      <div class="constraint-panel show" id="panel-pair">
+        <div id="pair-con-list"></div>
+        <div class="con-add-row">
+          <select id="pair-p1"><option value="">— 选择选手A —</option></select>
+          <span class="con-label">+</span>
+          <select id="pair-p2"><option value="">— 选择选手B —</option></select>
+          <select id="pair-rel" style="min-width:70px;">
+            <option value="team">组队</option>
+            <option value="opponent">对手</option>
+          </select>
+          <button class="btn btn-sm btn-add" id="add-pair-con">添加</button>
+        </div>
+        <div style="font-size:12px;color:var(--gray);margin-top:6px;">将指定选手A与B在某场中组队或对阵</div>
+      </div>
+
+      <!-- Fixed match panel -->
+      <div class="constraint-panel" id="panel-fixed">
+        <div id="fixed-con-list"></div>
+        <div class="con-add-row">
+          <select id="fixed-a"><option value="">A</option></select>
+          <span class="con-label">+</span>
+          <select id="fixed-b"><option value="">B</option></select>
+          <span class="con-label">vs</span>
+          <select id="fixed-c"><option value="">C</option></select>
+          <span class="con-label">+</span>
+          <select id="fixed-d"><option value="">D</option></select>
+          <button class="btn btn-sm btn-add" id="add-fixed-con">添加</button>
+        </div>
+        <div style="font-size:12px;color:var(--gray);margin-top:6px;">指定 A+B 组队对阵 C+D 组队</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+  <div class="success-msg" id="success-msg"></div>
+
+  <!-- Result Section -->
+  <div id="result">
+    <div class="card">
+      <h2>📋 排阵结果 <span id="relax-badge"></span></h2>
+      <div class="summary-line" id="summary-line"></div>
+      <div class="tab-bar" id="tab-bar"></div>
+      <div class="scroll-x">
+        <table class="match-table" id="match-table">
+          <thead><tr><th>场地</th><th>场次</th><th>类型</th><th>对阵</th></tr></thead>
+          <tbody id="match-body"></tbody>
+        </table>
+      </div>
+      <div class="seed-info" id="seed-info"></div>
+    </div>
+
+    <div class="card">
+      <h2>🤝 搭档统计</h2>
+      <div class="stats-grid" id="stats-grid"></div>
+    </div>
+
+    <div class="card">
+      <h2>📊 对阵覆盖率</h2>
+      <div class="coverage-grid" id="coverage-grid"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ==================== Algorithm ====================
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function combinations(n) {
+  const r = [];
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++)
+      r.push([i, j]);
+  return r;
+}
+
+function rrPairs(N) {
+  if (N < 2 || N % 2 !== 0) return [];
+  const k = N - 1;
+  const result = [];
+  for (let r = 0; r < k; r++) {
+    const pairs = [[k, r]];
+    for (let i = 1; i < N / 2; i++) {
+      const a = (r + i) % k;
+      const b = (r - i + k) % k;
+      if (a !== b) pairs.push([a, b]);
+    }
+    result.push(pairs);
+  }
+  return result;
+}
+
+const PRESETS = {};
+PRESETS['6,6'] = [
+  [1,'DB',[0,1],[2,3]],[1,'WB',[0,1],[2,3]],[1,'MX',[4,4],[5,5]],
+  [2,'DB',[0,5],[1,4]],[2,'WB',[0,4],[1,5]],[2,'MX',[2,2],[3,3]],
+  [3,'DB',[1,2],[3,4]],[3,'WB',[0,3],[2,4]],[3,'MX',[0,5],[5,1]],
+  [4,'DB',[0,3],[4,5]],[4,'WB',[1,2],[4,5]],[4,'MX',[1,0],[2,3]],
+  [5,'DB',[0,4],[1,3]],[5,'WB',[0,2],[1,4]],[5,'MX',[2,5],[5,3]]
+];
+PRESETS['4,4'] = [
+  [1,'DB',[0,1],[2,3]],[1,'WB',[0,1],[2,3]],
+  [2,'DB',[0,2],[1,3]],[2,'WB',[0,2],[1,3]],
+  [3,'DB',[0,3],[1,2]],[3,'WB',[0,3],[1,2]],
+  [4,'MX',[0,0],[1,1]],[4,'MX',[2,2],[3,3]],
+  [5,'MX',[0,2],[1,3]],[5,'MX',[2,1],[3,0]]
+];
+
+function constructDist(M, W) {
+  const cp = (M + W) / 4;
+  for (const c1 of [1, 2, 0]) {
+    if (c1 > cp) continue;
+    if ((M - 2 * c1) % 4 === 0 && (W - 2 * c1) % 4 === 0) {
+      const a = (M - 2 * c1) / 4, b = (W - 2 * c1) / 4;
+      if (a >= 0 && b >= 0 && a + b + c1 === cp)
+        return [[a, b, c1], [a, b, c1], [a, b, c1], [a, b, c1], [a, b, c1]];
+    }
+  }
+  const combos = [[0,2],[1,0],[2,0],[0,1],[1,2],[2,1]];
+  for (const [c1, c2] of combos) {
+    if (c1 > cp || c2 > cp) continue;
+    const a1 = (M - 2 * c1) / 4, b1 = (W - 2 * c1) / 4;
+    const a2 = (M - 2 * c2) / 4, b2 = (W - 2 * c2) / 4;
+    if (a1 < 0 || b1 < 0 || a2 < 0 || b2 < 0) continue;
+    if (a1 + b1 + c1 !== cp || a2 + b2 + c2 !== cp) continue;
+    for (let n1 = 1; n1 < 5; n1++) {
+      const n2 = 5 - n1;
+      const sc = n1 * c1 + n2 * c2;
+      const sa = (5 * M - 2 * sc) / 4, sb = (5 * W - 2 * sc) / 4;
+      if (n1 * a1 + n2 * a2 === sa && n1 * b1 + n2 * b2 === sb) {
+        const d = [];
+        for (let i = 0; i < n1; i++) d.push([a1, b1, c1]);
+        for (let i = 0; i < n2; i++) d.push([a2, b2, c2]);
+        shuffle(d);
+        return d;
+      }
+    }
+  }
+  return null;
+}
+
+function flexPair(players, used, maxT, forcedTeams) {
+  maxT = maxT || 1000;
+  forcedTeams = forcedTeams || [];
+  // forcedTeams: [[a,b], ...] try to make these teams first
+  const pool = [...players];
+
+  for (let t = 0; t < maxT; t++) {
+    const order = shuffle([...pool]);
+    const pairs = [];
+    const seen = new Set();
+    let ok = true;
+
+    // 1) Place forced teammate pairs
+    const remaining = [...order];
+    for (const ft of forcedTeams) {
+      const [a, b] = ft;
+      const ia = remaining.indexOf(a);
+      const ib = remaining.indexOf(b);
+      if (ia === -1 || ib === -1) { ok = false; break; }
+      const key = Math.min(a, b) + ',' + Math.max(a, b);
+      if (used.has(key) || seen.has(key)) { ok = false; break; }
+      pairs.push([a, b]);
+      seen.add(key);
+      // Remove from remaining (higher index first to avoid shift issues)
+      remaining.splice(Math.max(ia, ib), 1);
+      remaining.splice(Math.min(ia, ib), 1);
+    }
+    if (!ok) continue;
+
+    // 2) Randomly pair remaining
+    let i = 0;
+    while (i < remaining.length) {
+      const p1 = remaining[i];
+      let found = false;
+      for (let j = i + 1; j < remaining.length; j++) {
+        const p2 = remaining[j];
+        const key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+        if (!used.has(key) && !seen.has(key)) {
+          pairs.push([p1, p2]);
+          seen.add(key);
+          remaining.splice(j, 1);
+          remaining.splice(i, 1);
+          found = true;
+          break;
+        }
+      }
+      if (!found) { ok = false; break; }
+    }
+    if (!ok) continue;
+
+    // 3) Assemble matches: pair up consecutive teams
+    for (const s of seen) used.add(s);
+    shuffle(pairs);
+    const result = [];
+    for (let k = 0; k < pairs.length; k += 2)
+      result.push([pairs[k], pairs[k + 1]]);
+    return result;
+  }
+  return null;
+}
+
+function flexMix(males, females, used, maxT, forcedPairs) {
+  maxT = maxT || 1000;
+  forcedPairs = forcedPairs || [];
+  // forcedPairs: [[m,w], ...] try to make these mixed pairs first
+
+  for (let t = 0; t < maxT; t++) {
+    const ml = shuffle([...males]);
+    const fl = shuffle([...females]);
+    const pairs = [];
+    const seen = new Set();
+    let ok = true;
+
+    // 1) Place forced pairs
+    for (const fp of forcedPairs) {
+      const [m, w] = fp;
+      const im = ml.indexOf(m);
+      const iw = fl.indexOf(w);
+      if (im === -1 || iw === -1) { ok = false; break; }
+      const key = m + ',' + w;
+      if (used.has(key) || seen.has(key)) { ok = false; break; }
+      pairs.push([m, w]);
+      seen.add(key);
+      ml.splice(im, 1);
+      fl.splice(iw, 1);
+    }
+    if (!ok) continue;
+
+    // 2) Pair remaining randomly
+    for (const m of ml) {
+      let found = false;
+      for (let fi = 0; fi < fl.length; fi++) {
+        const w = fl[fi];
+        const key = m + ',' + w;
+        if (!used.has(key) && !seen.has(key)) {
+          pairs.push([m, w]);
+          seen.add(key);
+          fl.splice(fi, 1);
+          found = true;
+          break;
+        }
+      }
+      if (!found) { ok = false; break; }
+    }
+    if (!ok) continue;
+
+    // 3) Assemble matches: pair up consecutive pairs
+    for (const s of seen) used.add(s);
+    shuffle(pairs);
+    const result = [];
+    for (let k = 0; k < pairs.length; k += 2)
+      result.push([pairs[k], pairs[k + 1]]);
+    return result;
+  }
+  return null;
+}
+
+function checkPairs(matches) {
+  const dbUsed = new Set(), wbUsed = new Set(), mxUsed = new Set();
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    const s = type === 'DB' ? dbUsed : type === 'WB' ? wbUsed : mxUsed;
+    const k1 = type === 'MX' ? t1[0]+','+t1[1] : Math.min(...t1)+','+Math.max(...t1);
+    const k2 = type === 'MX' ? t2[0]+','+t2[1] : Math.min(...t2)+','+Math.max(...t2);
+    if (s.has(k1) || s.has(k2)) return false;
+    s.add(k1); s.add(k2);
+  }
+  return true;
+}
+
+/** Count pair occurrence across all matches (for constraint checking) */
+function countPairOccurrences(matches, type, p1, p2) {
+  let count = 0;
+  for (const m of matches) {
+    const [r, mt, t1, t2] = m;
+    if (mt !== type) continue;
+    const k1 = type === 'MX' ? Math.min(t1[0], t1[1])+','+Math.max(t1[0], t1[1]) : Math.min(...t1)+','+Math.max(...t1);
+    const k2 = type === 'MX' ? Math.min(t2[0], t2[1])+','+Math.max(t2[0], t2[1]) : Math.min(...t2)+','+Math.max(...t2);
+    const pk = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+    if (k1 === pk || k2 === pk) count++;
+  }
+  return count;
+}
+
+function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
+  // pairCons: [{p1,p2,rel}] for DB/WB
+  // mixedCons: [{m,w,rel}] for MX  (rel: 'team'|'opponent')
+  // fixedCons: [{a,b,c,d}] 4-player fixed match
+  // relax: how many extra repeats allowed (0=strict, 1=allow 1 repeat, 2=allow 2)
+
+  relax = relax || 0;
+  const sa = dist.reduce((s, d) => s + d[0], 0);
+  const sb = dist.reduce((s, d) => s + d[1], 0);
+  const dbTgt = new Array(M).fill(Math.floor(4 * sa / M));
+  for (let i = 0; i < (4 * sa) % M; i++) dbTgt[i]++;
+  const wbTgt = new Array(W).fill(Math.floor(4 * sb / W));
+  for (let i = 0; i < (4 * sb) % W; i++) wbTgt[i]++;
+
+  const dbLeft = [...dbTgt], wbLeft = [...wbTgt];
+  const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
+  const rrDB = rrPairs(M), rrWB = rrPairs(W);
+  const matches = [];
+
+  // Track which constraints have been satisfied already (to avoid re-forcing)
+  const satPair = new Set(); // key: 'p1,p2'
+  const satMixed = new Set(); // key: 'm,w'
+  const satFixed = new Set(); // index
+
+  // For fixed matches, try to allocate them
+  const fixedRemaining = fixedCons ? [...fixedCons] : [];
+
+  for (let r = 0; r < 5; r++) {
+    let [a, b, c] = dist[r];
+    let needDB = 4 * a, needWB = 4 * b, needMX = 2 * c;
+
+    // --- DB ---
+    let mxM;
+    if (needDB > 0) {
+      let cand = [...Array(M).keys()].filter(p => dbLeft[p] > 0)
+        .sort((p1, p2) => dbLeft[p2] - dbLeft[p1]);
+
+      if (cand.length < needDB) return null;
+      let chosen = new Set(cand.slice(0, needDB));
+
+      // Ensure constraint pair participants are in chosen (only if not yet satisfied)
+      const dbPairCons = pairCons.filter(pc => pc.gender === 'M');
+      const neededForPair = new Set();
+      for (const pc of dbPairCons) {
+        const pk = pc.p1 + ',' + pc.p2;
+        if (satPair.has(pk)) continue;
+        if (cand.includes(pc.p1) && cand.includes(pc.p2)) {
+          neededForPair.add(pc.p1);
+          neededForPair.add(pc.p2);
+        }
+      }
+      if (neededForPair.size <= needDB && neededForPair.size > 0) {
+        for (const np of neededForPair) {
+          if (!chosen.has(np)) {
+            for (const c of cand) {
+              if (!neededForPair.has(c) && chosen.has(c)) {
+                chosen.delete(c);
+                chosen.add(np);
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Build forced teams for DB (only for constraints NOT yet satisfied)
+      const forcedTeams = [];
+      for (const pc of dbPairCons) {
+        const pk = pc.p1 + ',' + pc.p2;
+        if (satPair.has(pk)) continue;
+        if (chosen.has(pc.p1) && chosen.has(pc.p2) && pc.rel === 'team') {
+          forcedTeams.push([pc.p1, pc.p2]);
+        }
+      }
+
+      // Check if fixed match fits here (4 males)
+      const fixedThis = [];
+      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+        const fc = fixedRemaining[fi];
+        // All 4 are male?
+        if (fc.genders && fc.genders === 'MMMM' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
+          fixedThis.push(fc);
+          fixedRemaining.splice(fi, 1);
+        }
+      }
+
+      for (const p of chosen) dbLeft[p]--;
+
+      if (isUniform && needDB === M && fixedThis.length === 0) {
+        const rrRound = rrDB[r % rrDB.length];
+        const pp = shuffle([...rrRound]);
+        for (let k = 0; k < pp.length; k += 2) {
+          const t1 = pp[k], t2 = pp[k + 1];
+          usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+          usedDB.add(Math.min(...t2)+','+Math.max(...t2));
+          matches.push([r+1, 'DB', t1, t2]);
+        }
+      } else {
+        const usedForCheck = relax > 0 ? new Set() : usedDB;
+        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams);
+        if (!pp) return null;
+
+        // Mark satisfied pair constraints (DB)
+        for (const [t1, t2] of pp) {
+          for (const pc of dbPairCons) {
+            const pk = pc.p1 + ',' + pc.p2;
+            if (satPair.has(pk)) continue;
+            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) {
+              satPair.add(pk);
+            } else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) {
+              satPair.add(pk);
+            }
+          }
+        }
+
+        const pairList = [];
+        for (const [t1, t2] of pp) {
+          pairList.push(t1, t2);
+        }
+
+        // Apply fixed matches - replace appropriate match
+        let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+        for (const fc of fixedThis) {
+          let replaced = false;
+          for (let pi = 0; pi < ppCopy.length; pi++) {
+            const [t1, t2] = ppCopy[pi];
+            // Check if we can replace this match with the fixed one
+            if (!replaced) {
+              ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]];
+              replaced = true;
+              // Mark as constrained
+              ppCopy[pi]._fixed = true;
+            }
+          }
+        }
+
+        for (let pi = 0; pi < ppCopy.length; pi++) {
+          const [t1, t2] = ppCopy[pi];
+          if (relax <= 0) {
+            usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+            usedDB.add(Math.min(...t2)+','+Math.max(...t2));
+          } else {
+            // Check pair counts
+            const k1 = Math.min(...t1)+','+Math.max(...t1);
+            const k2 = Math.min(...t2)+','+Math.max(...t2);
+            // In relaxed mode, we still add to usedDB but the validation is more lenient
+            usedDB.add(k1); usedDB.add(k2);
+          }
+          matches.push([r+1, 'DB', t1, t2, ppCopy[pi]._fixed ? true : false]);
+        }
+      }
+      mxM = [...Array(M).keys()].filter(p => !chosen.has(p));
+    } else {
+      mxM = [...Array(M).keys()];
+    }
+
+    // --- WB ---
+    let mxF;
+    if (needWB > 0) {
+      let cand = [...Array(W).keys()].filter(p => wbLeft[p] > 0)
+        .sort((p1, p2) => wbLeft[p2] - wbLeft[p1]);
+      if (cand.length < needWB) return null;
+      let chosen = new Set(cand.slice(0, needWB));
+
+      // Ensure pair constraint participants are selected (WB)
+      const wbPairCons = pairCons.filter(pc => pc.gender === 'W');
+      const neededForPair = new Set();
+      for (const pc of wbPairCons) {
+        const pk = pc.p1 + ',' + pc.p2;
+        if (satPair.has(pk)) continue;
+        if (cand.includes(pc.p1) && cand.includes(pc.p2)) {
+          neededForPair.add(pc.p1);
+          neededForPair.add(pc.p2);
+        }
+      }
+      if (neededForPair.size <= needWB && neededForPair.size > 0) {
+        for (const np of neededForPair) {
+          if (!chosen.has(np)) {
+            for (const c of cand) {
+              if (!neededForPair.has(c) && chosen.has(c)) {
+                chosen.delete(c);
+                chosen.add(np);
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      const forcedTeams = [];
+      for (const pc of wbPairCons) {
+        const pk = pc.p1 + ',' + pc.p2;
+        if (satPair.has(pk)) continue;
+        if (chosen.has(pc.p1) && chosen.has(pc.p2) && pc.rel === 'team') {
+          forcedTeams.push([pc.p1, pc.p2]);
+        }
+      }
+
+      // Check for fixed matches (4 females)
+      const fixedThis = [];
+      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+        const fc = fixedRemaining[fi];
+        if (fc.genders && fc.genders === 'WWWW' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
+          fixedThis.push(fc);
+          fixedRemaining.splice(fi, 1);
+        }
+      }
+
+      for (const p of chosen) wbLeft[p]--;
+
+      if (isUniform && needWB === W && fixedThis.length === 0) {
+        const rrRound = rrWB[r % rrWB.length];
+        const pp = shuffle([...rrRound]);
+        for (let k = 0; k < pp.length; k += 2) {
+          const t1 = pp[k], t2 = pp[k + 1];
+          usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+          usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+          matches.push([r+1, 'WB', t1, t2]);
+        }
+      } else {
+        const usedForCheck = relax > 0 ? new Set() : usedWB;
+        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams);
+        if (!pp) return null;
+
+        // Mark satisfied pair constraints (WB)
+        for (const [t1, t2] of pp) {
+          for (const pc of wbPairCons) {
+            const pk = pc.p1 + ',' + pc.p2;
+            if (satPair.has(pk)) continue;
+            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) {
+              satPair.add(pk);
+            } else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) {
+              satPair.add(pk);
+            }
+          }
+        }
+
+        let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+        for (const fc of fixedThis) {
+          for (let pi = 0; pi < ppCopy.length; pi++) {
+            if (!ppCopy[pi]._fixed) {
+              ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]];
+              ppCopy[pi]._fixed = true;
+              break;
+            }
+          }
+        }
+
+        for (let pi = 0; pi < ppCopy.length; pi++) {
+          const [t1, t2] = ppCopy[pi];
+          usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+          usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+          matches.push([r+1, 'WB', t1, t2, ppCopy[pi]._fixed ? true : false]);
+        }
+      }
+      mxF = [...Array(W).keys()].filter(p => !chosen.has(p));
+    } else {
+      mxF = [...Array(W).keys()];
+    }
+
+    // --- MX ---
+    if (needMX > 0) {
+      const forcedPairs = [];
+      for (const mc of mixedCons) {
+        const pk = mc.m + ',' + mc.w;
+        if (satMixed.has(pk)) continue;
+        if (mxM.includes(mc.m) && mxF.includes(mc.w) && mc.rel === 'team') {
+          forcedPairs.push([mc.m, mc.w]);
+        }
+      }
+
+      // Check for fixed MX matches (2M+2F)
+      const fixedThis = [];
+      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+        const fc = fixedRemaining[fi];
+        if (fc.genders && fc.genders === 'MXMX' && mxM.includes(fc.a) && mxF.includes(fc.b) && mxM.includes(fc.c) && mxF.includes(fc.d)) {
+          fixedThis.push(fc);
+          fixedRemaining.splice(fi, 1);
+        }
+      }
+
+      const usedForCheck = relax > 0 ? new Set() : usedMX;
+      const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs);
+      if (!pp) return null;
+
+      // Mark satisfied mixed constraints
+      for (const [t1, t2] of pp) {
+        for (const mc of mixedCons) {
+          const pk = mc.m + ',' + mc.w;
+          if (satMixed.has(pk)) continue;
+          if (mc.rel === 'team' && ((t1[0] === mc.m && t1[1] === mc.w) || (t2[0] === mc.m && t2[1] === mc.w))) {
+            satMixed.add(pk);
+          } else if (mc.rel === 'opponent' && ((t1[0] === mc.m && t2[1] === mc.w) || (t2[0] === mc.m && t1[1] === mc.w))) {
+            satMixed.add(pk);
+          }
+        }
+      }
+
+      let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+      for (const fc of fixedThis) {
+        for (let pi = 0; pi < ppCopy.length; pi++) {
+          if (!ppCopy[pi]._fixed) {
+            ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]];
+            ppCopy[pi]._fixed = true;
+            break;
+          }
+        }
+      }
+
+      for (let pi = 0; pi < ppCopy.length; pi++) {
+        const [t1, t2] = ppCopy[pi];
+        usedMX.add(t1[0]+','+t1[1]);
+        usedMX.add(t2[0]+','+t2[1]);
+        matches.push([r+1, 'MX', t1, t2, ppCopy[pi]._fixed ? true : false]);
+      }
+    }
+  }
+
+  // Verify match counts (each player plays 5)
+  const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    if (type === 'DB') { for (const p of [...t1, ...t2]) mc[p]++; }
+    else if (type === 'WB') { for (const p of [...t1, ...t2]) fc[p]++; }
+    else { mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++; }
+  }
+  if (!mc.every(v => v === 5) || !fc.every(v => v === 5)) return null;
+
+  // Verify pairs (with relaxation)
+  if (relax <= 0) {
+    if (!checkPairs(matches)) return null;
+  } else {
+    // Relaxed check: allow repeated pairs up to (1 + relax) times
+    const dbCount = {}, wbCount = {}, mxCount = {};
+    for (const m of matches) {
+      const [r, type, t1, t2] = m;
+      const cnt = type === 'DB' ? dbCount : type === 'WB' ? wbCount : mxCount;
+      const k1 = type === 'MX' ? t1[0]+','+t1[1] : Math.min(...t1)+','+Math.max(...t1);
+      const k2 = type === 'MX' ? t2[0]+','+t2[1] : Math.min(...t2)+','+Math.max(...t2);
+      cnt[k1] = (cnt[k1] || 0) + 1;
+      cnt[k2] = (cnt[k2] || 0) + 1;
+    }
+    const maxAllow = 1 + relax;
+    for (const cnt of [dbCount, wbCount, mxCount]) {
+      for (const v of Object.values(cnt)) {
+        if (v > maxAllow) return null;
+      }
+    }
+  }
+
+  return matches;
+}
+
+function generate(M, W, tries, constraints, relax) {
+  tries = tries || 3000;
+  relax = relax || 0;
+  const key = M + ',' + W;
+
+  // If no constraints, try presets
+  if ((!constraints || constraints.length === 0) && PRESETS[key]) {
+    const preset = PRESETS[key].map(m => [...m]);
+    return preset;
+  }
+
+  const dist = constructDist(M, W);
+  if (!dist) return null;
+  const isUniform = dist.every(d => d[0] === dist[0][0] && d[1] === dist[0][1] && d[2] === dist[0][2]);
+
+  // Prepare constraints
+  const pairCons = [];
+  const mixedCons = [];
+  const fixedCons = [];
+  if (constraints) {
+    for (const c of constraints) {
+      if (c.type === 'pair') {
+        if (c.sameGender) {
+          pairCons.push({ p1: c.p1, p2: c.p2, rel: c.rel, gender: c.gender });
+        } else {
+          // Mixed: m is male, w is female. Need to determine which is which.
+          // c.p1 is male index, c.p2 is female index
+          mixedCons.push({ m: c.p1, w: c.p2, rel: c.rel });
+        }
+      } else if (c.type === 'fixed') {
+        // Determine genders: count males among a,b,c,d
+        let genders = '';
+        for (const p of [c.a, c.b, c.c, c.d]) {
+          genders += p.g === 'M' ? 'M' : 'W';
+        }
+        // The actual indices in c.a/c.b/c.c/c.d are player indices
+        fixedCons.push({
+          a: c.a.i, b: c.b.i, c: c.c.i, d: c.d.i,
+          genders: genders
+        });
+      }
+    }
+  }
+
+  for (let i = 0; i < tries; i++) {
+    const r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax);
+    if (r) {
+      // Verify constraints are actually met
+      const ok = verifyConstraints(r, M, W, constraints, relax);
+      if (ok) return r;
+    }
+  }
+  return null;
+}
+
+function verifyConstraints(matches, M, W, constraints, relax) {
+  if (!constraints || constraints.length === 0) return true;
+  relax = relax || 0;
+
+  for (const c of constraints) {
+    if (c.type === 'pair') {
+      let found = false;
+      for (const m of matches) {
+        const [r, type, t1, t2] = m;
+        // Determine if this match type is relevant
+        if (c.sameGender) {
+          const gender = c.gender || 'M';
+          if ((gender === 'M' && type !== 'DB') || (gender === 'W' && type !== 'WB')) continue;
+        } else {
+          if (type !== 'MX') continue;
+        }
+
+        if (c.rel === 'team') {
+          if (type === 'MX') {
+            if ((t1[0] === c.p1 && t1[1] === c.p2) || (t2[0] === c.p1 && t2[1] === c.p2)) {
+              found = true; break;
+            }
+          } else {
+            if ((t1.includes(c.p1) && t1.includes(c.p2)) || (t2.includes(c.p1) && t2.includes(c.p2))) {
+              found = true; break;
+            }
+          }
+        } else { // opponent
+          if (type === 'MX') {
+            // MX opponent: m in different team from w
+            if ((t1[0] === c.p1 && t2[1] === c.p2) || (t2[0] === c.p1 && t1[1] === c.p2)) {
+              found = true; break;
+            }
+          } else {
+            // Same gender opponent: on different teams in same match
+            const onTeam1 = t1.includes(c.p1);
+            const onTeam2 = t2.includes(c.p2);
+            const onTeam1b = t1.includes(c.p2);
+            const onTeam2b = t2.includes(c.p1);
+            if ((onTeam1 && onTeam2) || (onTeam1b && onTeam2b)) {
+              found = true; break;
+            }
+          }
+        }
+      }
+      if (!found) return false;
+    } else if (c.type === 'fixed') {
+      let found = false;
+      const a = c.a.i, b = c.b.i, cc = c.c.i, d = c.d.i;
+      for (const m of matches) {
+        const [r, type, t1, t2] = m;
+        const typeMatch = (c.genders === 'MMMM') ? type === 'DB' :
+                          (c.genders === 'WWWW') ? type === 'WB' : type === 'MX';
+
+        if (!typeMatch) continue;
+
+        // Check if the match has the right players
+        function hasAll(team, players) {
+          return players.every(p => team.includes(p));
+        }
+
+        if (type === 'MX') {
+          if ((t1[0] === a && t1[1] === b && t2[0] === cc && t2[1] === d) ||
+              (t1[0] === cc && t1[1] === d && t2[0] === a && t2[1] === b)) {
+            found = true; break;
+          }
+        } else {
+          const team1 = [a, b], team2 = [cc, d];
+          if ((hasAll(t1, team1) && hasAll(t2, team2)) ||
+              (hasAll(t1, team2) && hasAll(t2, team1))) {
+            found = true; break;
+          }
+        }
+      }
+      if (!found) return false;
+    }
+  }
+  return true;
+}
+
+// ==================== Rendering ====================
+
+const TYPE_LABELS = { DB: '男双', WB: '女双', MX: '混双' };
+const TYPE_CLASS = { DB: 'db', WB: 'wb', MX: 'mx' };
+
+let players = [];
+let currentRound = 0;
+let lastResult = null;
+let maleNames = [];
+let femaleNames = [];
+let pairConstraints = [];
+let fixedConstraints = [];
+
+function nameOf(gender, idx) {
+  if (gender === 'M') return maleNames[idx] || ('M' + (idx + 1));
+  return femaleNames[idx] || ('W' + (idx + 1));
+}
+
+function updateCount() {
+  const m = players.filter(p => p.gender === '男').length;
+  const w = players.filter(p => p.gender === '女').length;
+  document.getElementById('count-badge').textContent = `(男 ${m} 人 · 女 ${w} 人)`;
+}
+
+function renderPlayerList() {
+  const list = document.getElementById('player-list');
+  list.innerHTML = '';
+  players.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    row.innerHTML = `
+      <span class="row-num">${i + 1}</span>
+      <select>${['男', '女'].map(g =>
+        `<option value="${g}" ${p.gender === g ? 'selected' : ''}>${g}</option>`
+      ).join('')}</select>
+      <input type="text" placeholder="输入选手姓名" value="${p.name}">
+      <button class="del-btn" data-i="${i}">✕</button>
+    `;
+    row.querySelector('select').addEventListener('change', function() {
+      players[i].gender = this.value;
+      updateCount();
+      refreshConstraintSelects();
+    });
+    row.querySelector('input').addEventListener('input', function() {
+      players[i].name = this.value;
+    });
+    row.querySelector('.del-btn').addEventListener('click', function() {
+      players.splice(i, 1);
+      renderPlayerList();
+      updateCount();
+      refreshConstraintSelects();
+    });
+    list.appendChild(row);
+  });
+}
+
+function addPlayer(gender, name) {
+  players.push({ gender: gender || '男', name: name || '' });
+  renderPlayerList();
+  updateCount();
+  refreshConstraintSelects();
+}
+
+document.getElementById('add-btn').addEventListener('click', () => addPlayer());
+
+// ===== Constraint UI =====
+
+document.getElementById('constraint-toggle').addEventListener('change', function() {
+  document.getElementById('constraint-body').style.display = this.checked ? 'block' : 'none';
+});
+
+// Tab switching
+document.querySelectorAll('.constraint-tab').forEach(tab => {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.constraint-tab').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    document.querySelectorAll('.constraint-panel').forEach(p => p.classList.remove('show'));
+    document.getElementById('panel-' + this.dataset.panel).classList.add('show');
+  });
+});
+
+function getPlayerOptions(includeEmpty) {
+  return players.map((p, i) => {
+    const label = (p.name || '无名') + ' (' + p.gender + ')';
+    return `<option value="${i}">${label}</option>`;
+  });
+}
+
+function refreshConstraintSelects() {
+  const opts = ['<option value="">— 选择选手 —</option>', ...getPlayerOptions()].join('');
+  ['pair-p1', 'pair-p2'].forEach(id => {
+    const sel = document.getElementById(id);
+    const val = sel.value;
+    sel.innerHTML = opts;
+    sel.value = val;
+  });
+
+  const opts2 = ['<option value="">—</option>', ...getPlayerOptions()].join('');
+  ['fixed-a', 'fixed-b', 'fixed-c', 'fixed-d'].forEach(id => {
+    const sel = document.getElementById(id);
+    const val = sel.value;
+    sel.innerHTML = opts2;
+    sel.value = val;
+  });
+  renderPairConList();
+  renderFixedConList();
+}
+
+function renderPairConList() {
+  const list = document.getElementById('pair-con-list');
+  list.innerHTML = '';
+  pairConstraints.forEach((c, i) => {
+    const p1Name = nameOf(c.gender === 'M' ? 'M' : 'W', c.p1);
+    const p2Name = nameOf(c.gender === 'M' ? 'W' : 'M', c.p2);
+    const relLabel = c.rel === 'team' ? '组队' : '对阵';
+    const genderLabel = c.sameGender ? (c.gender === 'M' ? '男' : '女') : '混';
+    const tagClass = c.sameGender ? (c.gender === 'M' ? 'blue' : 'pink') : 'orange';
+    const tagText = c.sameGender ? (c.gender === 'M' ? '男双' : '女双') : '混双';
+    const row = document.createElement('div');
+    row.className = 'con-row';
+    row.innerHTML = `
+      <span class="con-tag ${tagClass}">${tagText}</span>
+      <strong>${p1Name}</strong>
+      <span class="con-label">${relLabel}</span>
+      <strong>${p2Name}</strong>
+      <button class="btn btn-sm btn-danger" data-i="${i}" style="margin-left:auto;">✕</button>
+    `;
+    row.querySelector('.btn-danger').addEventListener('click', () => {
+      pairConstraints.splice(i, 1);
+      renderPairConList();
+    });
+    list.appendChild(row);
+  });
+}
+
+function renderFixedConList() {
+  const list = document.getElementById('fixed-con-list');
+  list.innerHTML = '';
+  fixedConstraints.forEach((c, i) => {
+    const aName = nameOf(c.a.g, c.a.i);
+    const bName = nameOf(c.b.g, c.b.i);
+    const cName = nameOf(c.c.g, c.c.i);
+    const dName = nameOf(c.d.g, c.d.i);
+    const row = document.createElement('div');
+    row.className = 'con-row';
+    row.innerHTML = `
+      <span class="con-tag orange">指定</span>
+      <strong>${aName}</strong><span class="con-label">+</span><strong>${bName}</strong>
+      <span class="con-label">vs</span>
+      <strong>${cName}</strong><span class="con-label">+</span><strong>${dName}</strong>
+      <button class="btn btn-sm btn-danger" data-i="${i}" style="margin-left:auto;">✕</button>
+    `;
+    row.querySelector('.btn-danger').addEventListener('click', () => {
+      fixedConstraints.splice(i, 1);
+      renderFixedConList();
+    });
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('add-pair-con').addEventListener('click', () => {
+  const p1 = parseInt(document.getElementById('pair-p1').value);
+  const p2 = parseInt(document.getElementById('pair-p2').value);
+  const rel = document.getElementById('pair-rel').value;
+
+  if (isNaN(p1) || isNaN(p2) || p1 < 0 || p2 < 0) {
+    showError('请选择两位选手');
+    return;
+  }
+  if (p1 === p2) {
+    showError('不能选择同一位选手');
+    return;
+  }
+
+  const g1 = players[p1].gender;
+  const g2 = players[p2].gender;
+  const sameGender = g1 === g2;
+  const genderCode = g1 === '男' ? 'M' : 'W';
+
+  // Map player indices to M/W indices
+  const mn = players.filter(p => p.gender === '男');
+  const wn = players.filter(p => p.gender === '女');
+
+  let idx1, idx2;
+  if (sameGender && g1 === '男') {
+    idx1 = mn.indexOf(players[p1]);
+    idx2 = mn.indexOf(players[p2]);
+  } else if (sameGender && g1 === '女') {
+    idx1 = wn.indexOf(players[p1]);
+    idx2 = wn.indexOf(players[p2]);
+  } else {
+    // Mixed
+    idx1 = mn.indexOf(players[p1]);
+    idx2 = wn.indexOf(players[p2]);
+    if (idx1 === -1) { idx1 = mn.indexOf(players[p2]); idx2 = wn.indexOf(players[p1]); }
+  }
+
+  pairConstraints.push({
+    type: 'pair',
+    p1: idx1,
+    p2: idx2,
+    rel: rel,
+    sameGender: sameGender,
+    gender: sameGender ? genderCode : 'M'  // male index by default for mixed
+  });
+
+  renderPairConList();
+  document.getElementById('pair-p1').value = '';
+  document.getElementById('pair-p2').value = '';
+  hideError();
+});
+
+document.getElementById('add-fixed-con').addEventListener('click', () => {
+  const a = parseInt(document.getElementById('fixed-a').value);
+  const b = parseInt(document.getElementById('fixed-b').value);
+  const c = parseInt(document.getElementById('fixed-c').value);
+  const d = parseInt(document.getElementById('fixed-d').value);
+
+  if ([a, b, c, d].some(v => isNaN(v) || v < 0)) {
+    showError('请选择四位不同的选手');
+    return;
+  }
+  const set = new Set([a, b, c, d]);
+  if (set.size !== 4) {
+    showError('四位选手不能重复');
+    return;
+  }
+
+  const mn = players.filter(p => p.gender === '男');
+  const wn = players.filter(p => p.gender === '女');
+
+  function getGenderIdx(pi) {
+    return players[pi].gender === '男' ? { g: 'M', i: mn.indexOf(players[pi]) } : { g: 'W', i: wn.indexOf(players[pi]) };
+  }
+
+  const ga = getGenderIdx(a), gb = getGenderIdx(b), gc = getGenderIdx(c), gd = getGenderIdx(d);
+  const genders = [ga.g, gb.g, gc.g, gd.g].join('');
+
+  // Validate: must be all same gender or 2M+2F (MX pattern)
+  const mCount = genders.split('').filter(g => g === 'M').length;
+  const wCount = 4 - mCount;
+  if (mCount !== 0 && mCount !== 4 && mCount !== 2) {
+    showError('四人指定仅支持：全男/全女/两男两女（混双）');
+    return;
+  }
+  if (mCount === 2) {
+    // Check MX pattern: each team should have 1M + 1F
+    // Team1 = A+B, Team2 = C+D
+    if (ga.g === gb.g || gc.g === gd.g) {
+      showError('混双组队每队需一男一女（如 A男+B女 vs C男+D女）');
+      return;
+    }
+  }
+
+  fixedConstraints.push({
+    type: 'fixed',
+    a: ga, b: gb, c: gc, d: gd,
+    genders: genders
+  });
+
+  renderFixedConList();
+  document.getElementById('fixed-a').value = '';
+  document.getElementById('fixed-b').value = '';
+  document.getElementById('fixed-c').value = '';
+  document.getElementById('fixed-d').value = '';
+  hideError();
+});
+
+function showError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-msg').classList.add('show');
+  document.getElementById('success-msg').classList.remove('show');
+}
+
+function hideError() {
+  document.getElementById('error-msg').classList.remove('show');
+  document.getElementById('success-msg').classList.remove('show');
+}
+
+// ===== Generate =====
+
+document.getElementById('gen-btn').addEventListener('click', () => {
+  hideError();
+  const mn = players.filter(p => p.gender === '男');
+  const wn = players.filter(p => p.gender === '女');
+  const M = mn.length, W = wn.length;
+
+  if (players.length === 0) { showError('请先添加选手！'); return; }
+  for (const p of players) { if (!p.name.trim()) { showError('请为所有选手填写姓名！'); return; } }
+  if (M % 2 !== 0 || W % 2 !== 0) { showError('男女人数必须都是偶数（当前男' + M + '人，女' + W + '人）'); return; }
+  if ((M + W) % 4 !== 0) { showError('总人数必须是4的倍数（当前共' + (M+W) + '人）'); return; }
+
+  maleNames = mn.map(p => p.name.trim());
+  femaleNames = wn.map(p => p.name.trim());
+
+  const constraintsEnabled = document.getElementById('constraint-toggle').checked;
+  let constraints = [];
+  if (constraintsEnabled) {
+    constraints = [...pairConstraints, ...fixedConstraints];
+  }
+
+  // Try strict first
+  let result = generate(M, W, 2000, constraints, 0);
+  let relaxLevel = 0;
+
+  if (!result && constraints.length > 0) {
+    // Try relaxed (allow 1 repeat)
+    result = generate(M, W, 3000, constraints, 1);
+    relaxLevel = 1;
+  }
+  if (!result && constraints.length > 0) {
+    // Try more relaxed (allow 2 repeats)
+    result = generate(M, W, 5000, constraints, 2);
+    relaxLevel = 2;
+  }
+
+  if (!result) {
+    if (constraints.length > 0) {
+      showError('无法在满足指定约束的条件下生成排阵，请检查约束是否与人数组合冲突，或减少指定条件');
+    } else {
+      showError('无法生成排阵，当前算法不支持该人数组合');
+    }
+    return;
+  }
+
+  document.getElementById('success-msg').textContent = '✅ 排阵生成成功！' + (relaxLevel > 0 ? '（已放宽重复搭档限制，允许重复 ' + relaxLevel + ' 次）' : '');
+  document.getElementById('success-msg').classList.add('show');
+
+  // Mark constrained matches
+  const constrainedSet = new Set();
+  if (constraints.length > 0) {
+    // Find which matches satisfy constraints
+    for (const c of constraints) {
+      if (c.type === 'pair') {
+        for (const m of result) {
+          const [r, type, t1, t2] = m;
+          if (c.sameGender) {
+            const gender = c.gender || 'M';
+            if ((gender === 'M' && type !== 'DB') || (gender === 'W' && type !== 'WB')) continue;
+          } else {
+            if (type !== 'MX') continue;
+          }
+          if (c.rel === 'team') {
+            if (type === 'MX') {
+              if ((t1[0] === c.p1 && t1[1] === c.p2) || (t2[0] === c.p1 && t2[1] === c.p2))
+                m[4] = true;
+            } else {
+              if ((t1.includes(c.p1) && t1.includes(c.p2)) || (t2.includes(c.p1) && t2.includes(c.p2)))
+                m[4] = true;
+            }
+          } else {
+            if (type === 'MX') {
+              if ((t1[0] === c.p1 && t2[1] === c.p2) || (t2[0] === c.p1 && t1[1] === c.p2))
+                m[4] = true;
+            } else {
+              if ((t1.includes(c.p1) && t2.includes(c.p2)) || (t1.includes(c.p2) && t2.includes(c.p1)))
+                m[4] = true;
+            }
+          }
+        }
+      } else if (c.type === 'fixed') {
+        const a = c.a.i, b = c.b.i, cc = c.c.i, d = c.d.i;
+        for (const m of result) {
+          const [r, type, t1, t2] = m;
+          const typeMatch = (c.genders === 'MMMM') ? type === 'DB' :
+                            (c.genders === 'WWWW') ? type === 'WB' : type === 'MX';
+          if (!typeMatch) continue;
+          if (type === 'MX') {
+            if ((t1[0] === a && t1[1] === b && t2[0] === cc && t2[1] === d) ||
+                (t1[0] === cc && t1[1] === d && t2[0] === a && t2[1] === b))
+              m[4] = true;
+          } else {
+            if ((t1.includes(a) && t1.includes(b) && t2.includes(cc) && t2.includes(d)) ||
+                (t1.includes(cc) && t1.includes(d) && t2.includes(a) && t2.includes(b)))
+              m[4] = true;
+          }
+        }
+      }
+    }
+  }
+
+  showResult(result, M, W, relaxLevel, constraints);
+});
+
+function showResult(matches, M, W, relaxLevel, constraints) {
+  const el = document.getElementById('result');
+  el.classList.add('show');
+
+  const totalMatches = matches.length;
+  const matchesPerRound = totalMatches / 5;
+
+  // Relax badge
+  const badge = document.getElementById('relax-badge');
+  if (relaxLevel > 0) {
+    badge.innerHTML = `<span class="relax-badge relaxed">放宽约束 (允许重复 ${relaxLevel} 次)</span>`;
+  } else {
+    badge.innerHTML = `<span class="relax-badge strict">严格模式</span>`;
+  }
+
+  // Summary
+  let dbCount = 0, wbCount = 0, mxCount = 0;
+  const conCount = matches.filter(m => m[4]).length;
+  for (const m of matches) {
+    if (m[1] === 'DB') dbCount++;
+    else if (m[1] === 'WB') wbCount++;
+    else mxCount++;
+  }
+  let conText = '';
+  if (constraints && constraints.length > 0) {
+    const satisfied = matches.filter(m => m[4]).length;
+    conText = ` · 📌 ${satisfied} 场指定匹配`;
+  }
+  document.getElementById('summary-line').innerHTML = `
+    <span>👥 男 ${M} 人 · 女 ${W} 人</span>
+    <span>🏸 ${dbCount} 男双 · ${wbCount} 女双 · ${mxCount} 混双</span>
+    <span>📅 ${matchesPerRound} 片场地 × 5 轮${conText}</span>
+  `;
+
+  // Tabs
+  const tabBar = document.getElementById('tab-bar');
+  tabBar.innerHTML = '';
+  for (let r = 0; r < 5; r++) {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (r === currentRound ? ' active' : '');
+    btn.textContent = '第' + (r + 1) + '轮';
+    btn.addEventListener('click', () => {
+      currentRound = r;
+      renderRound(matches, r);
+      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === r));
+    });
+    tabBar.appendChild(btn);
+  }
+  currentRound = 0;
+  renderRound(matches, 0);
+
+  document.getElementById('seed-info').textContent =
+    '💡 ' + M + '男' + W + '女 · ' + (relaxLevel > 0 ? '放宽重复搭档限制' : '零重复搭档') + ' · 每人5场';
+
+  renderPartnerStats(matches, M, W);
+  renderCoverage(matches, M, W);
+}
+
+function renderRound(matches, round) {
+  const matchesInRound = matches.filter(m => m[0] === round + 1);
+  const tbody = document.getElementById('match-body');
+  tbody.innerHTML = '';
+  let globalStart = 0;
+  for (let r = 0; r < round; r++) {
+    globalStart += matches.filter(m => m[0] === r + 1).length;
+  }
+  matchesInRound.forEach((m, i) => {
+    const [r, type, t1, t2, constrained] = m;
+    const gi = globalStart + i + 1;
+    let team1Str, team2Str;
+    if (type === 'DB') {
+      team1Str = nameOf('M', t1[0]) + ' + ' + nameOf('M', t1[1]);
+      team2Str = nameOf('M', t2[0]) + ' + ' + nameOf('M', t2[1]);
+    } else if (type === 'WB') {
+      team1Str = nameOf('W', t1[0]) + ' + ' + nameOf('W', t1[1]);
+      team2Str = nameOf('W', t2[0]) + ' + ' + nameOf('W', t2[1]);
+    } else {
+      team1Str = nameOf('M', t1[0]) + ' + ' + nameOf('W', t1[1]);
+      team2Str = nameOf('M', t2[0]) + ' + ' + nameOf('W', t2[1]);
+    }
+    const tr = document.createElement('tr');
+    if (constrained) tr.className = 'constrained-match';
+    tr.innerHTML = `
+      <td>🏟️ ${i + 1} 号场${constrained ? ' 📌' : ''}</td>
+      <td>第 ${gi} 场</td>
+      <td><span class="type-tag ${TYPE_CLASS[type]}">${TYPE_LABELS[type]}</span></td>
+      <td><strong>${team1Str}</strong> vs <strong>${team2Str}</strong></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderPartnerStats(matches, M, W) {
+  const grid = document.getElementById('stats-grid');
+  grid.innerHTML = '';
+  const mp = {}, wp = {};
+  for (let i = 0; i < M; i++) mp[i] = { db: {}, mx: {} };
+  for (let i = 0; i < W; i++) wp[i] = { db: {}, mx: {} };
+
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    if (type === 'DB') {
+      incPartner(mp[t1[0]].db, t1[1], 'M');
+      incPartner(mp[t1[1]].db, t1[0], 'M');
+      incPartner(mp[t2[0]].db, t2[1], 'M');
+      incPartner(mp[t2[1]].db, t2[0], 'M');
+    } else if (type === 'WB') {
+      incPartner(wp[t1[0]].db, t1[1], 'W');
+      incPartner(wp[t1[1]].db, t1[0], 'W');
+      incPartner(wp[t2[0]].db, t2[1], 'W');
+      incPartner(wp[t2[1]].db, t2[0], 'W');
+    } else {
+      incPartner(mp[t1[0]].mx, t1[1], 'W');
+      incPartner(wp[t1[1]].mx, t1[0], 'M');
+      incPartner(mp[t2[0]].mx, t2[1], 'W');
+      incPartner(wp[t2[1]].mx, t2[0], 'M');
+    }
+  }
+
+  function incPartner(obj, idx, prefix) {
+    const k = prefix + idx;
+    obj[k] = (obj[k] || 0) + 1;
+  }
+
+  function fmtPartners(obj, prefix) {
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return '暂无搭档';
+    return keys.map(k => {
+      const label = nameOf(prefix === 'M' ? 'M' : 'W', parseInt(k.replace(/[MW]/, '')));
+      return `<span>${label} ×${obj[k]}</span>`;
+    }).join(' ');
+  }
+
+  for (let i = 0; i < M; i++) {
+    const p = mp[i];
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    const dbP = fmtPartners(p.db, 'M');
+    const mxP = fmtPartners(p.mx, 'W');
+    card.innerHTML = `<div class="name">👤 ${nameOf('M', i)}</div><div class="detail">${dbP ? `<div>🏸 男双队友：${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档：${mxP}</div>` : ''}</div>`;
+    grid.appendChild(card);
+  }
+  for (let i = 0; i < W; i++) {
+    const p = wp[i];
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    const dbP = fmtPartners(p.db, 'W');
+    const mxP = fmtPartners(p.mx, 'M');
+    card.innerHTML = `<div class="name">👤 ${nameOf('W', i)}</div><div class="detail">${dbP ? `<div>🏸 女双队友：${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档：${mxP}</div>` : ''}</div>`;
+    grid.appendChild(card);
+  }
+}
+
+function renderCoverage(matches, M, W) {
+  const grid = document.getElementById('coverage-grid');
+  const maleCombos = combinations(M);
+  const maleActual = new Set();
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    if (type === 'DB') {
+      for (const a of t1) for (const b of t2) maleActual.add(Math.min(a,b)+','+Math.max(a,b));
+    } else if (type === 'MX') {
+      maleActual.add(Math.min(t1[0],t2[0])+','+Math.max(t1[0],t2[0]));
+    }
+  }
+  const mcTotal = maleCombos.length, mcActual = maleActual.size;
+  const mcMissing = maleCombos.filter(([a,b]) => !maleActual.has(a+','+b)).map(([a,b]) => nameOf('M',a)+' vs '+nameOf('M',b));
+
+  const femaleCombos = combinations(W);
+  const femaleActual = new Set();
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    if (type === 'WB') {
+      for (const a of t1) for (const b of t2) femaleActual.add(Math.min(a,b)+','+Math.max(a,b));
+    } else if (type === 'MX') {
+      femaleActual.add(Math.min(t1[1],t2[1])+','+Math.max(t1[1],t2[1]));
+    }
+  }
+  const fcTotal = femaleCombos.length, fcActual = femaleActual.size;
+  const fcMissing = femaleCombos.filter(([a,b]) => !femaleActual.has(a+','+b)).map(([a,b]) => nameOf('W',a)+' vs '+nameOf('W',b));
+
+  grid.innerHTML = `
+    <div class="cov-box"><h3>🏸 男选手对阵</h3>
+      <div class="stat ${mcActual === mcTotal ? '' : 'warn'}">${mcActual} / ${mcTotal}</div>
+      <div class="sub">${mcActual === mcTotal ? '✅ 全对阵！' : '⚡ 已对阵 ' + mcActual + ' 组'}</div>
+      ${mcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + mcMissing.length + ' 组：' + mcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖！</div>'}
+    </div>
+    <div class="cov-box"><h3>🎾 女选手对阵</h3>
+      <div class="stat ${fcActual === fcTotal ? '' : 'warn'}">${fcActual} / ${fcTotal}</div>
+      <div class="sub">${fcActual === fcTotal ? '✅ 全对阵！' : '⚡ 已对阵 ' + fcActual + ' 组'}</div>
+      ${fcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + fcMissing.length + ' 组：' + fcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖！</div>'}
+    </div>`;
+}
+
+// ==================== Help toggle ====================
+document.getElementById('help-toggle').addEventListener('click', function() {
+  const body = document.getElementById('help-body');
+  const icon = document.getElementById('help-icon');
+  body.classList.toggle('open');
+  icon.classList.toggle('open');
+});
+
+// ==================== Init ====================
+addPlayer('男', '张三');
+addPlayer('男', '李四');
+addPlayer('男', '王五');
+addPlayer('男', '赵六');
+addPlayer('女', '孙七');
+addPlayer('女', '周八');
+addPlayer('女', '吴九');
+addPlayer('女', '郑十');
+</script>
+</body>
+</html>
