@@ -443,7 +443,10 @@
 
   <!-- Input Section -->
   <div class="card">
-    <h2>选手名单 <span class="count-badge" id="count-badge"></span></h2>
+    <h2>
+      选手名单 <span class="count-badge" id="count-badge"></span>
+      <button class="btn btn-sm btn-outline" id="reset-players-btn" style="float:right;font-size:11px;padding:3px 10px;" title="恢复默认4男4女">↺ 重置选手</button>
+    </h2>
     <div id="player-list"></div>
     <div class="mode-selector">
       <span class="mode-label">🎯 场次偏好</span>
@@ -455,9 +458,11 @@
     <div class="mode-selector" style="margin-top:0;padding-bottom:6px;">
       <span class="mode-label">📅 日期时间</span>
       <span style="font-size:13px;color:var(--gray);">日期</span>
-      <input type="text" id="export-date" value="6月25日" style="width:80px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
-      <span style="font-size:13px;color:var(--gray);">场地时间</span>
-      <input type="text" id="export-venue-time" value="19:00-22:00" style="width:100px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <input type="date" id="export-date" style="width:140px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:13px;color:var(--gray);">开始</span>
+      <input type="time" id="venue-start" value="19:00" style="width:80px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:13px;color:var(--gray);">结束</span>
+      <input type="time" id="venue-end" value="22:00" style="width:80px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
       <span style="font-size:13px;color:var(--gray);">每轮时长</span>
       <input type="text" id="export-round-duration" value="30" style="width:40px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
       <span style="font-size:12px;color:var(--gray);">分钟</span>
@@ -2494,10 +2499,13 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
     'D9E2F3','E2F0D9','EEE7D2','D1EFE0','EFD1E0','D2EED2','D9EED2','D2D2EE','EED2D2','EFE0D1'];
   
   // ========== Inputs ==========
-  var dateVal = document.getElementById('export-date')?.value || '6月25日';
-  var venueVal = document.getElementById('export-venue-time')?.value || '19:00-22:00';
+  var dateRaw = document.getElementById('export-date')?.value || '';
+  var dateVal = dateRaw ? dateRaw.split('-').slice(1).reverse().join('\u6708') + '\u65E5' : '6\u670825\u65E5';
+  var venueStart = document.getElementById('venue-start')?.value || '19:00';
+  var venueEnd = document.getElementById('venue-end')?.value || '22:00';
+  var venueVal = venueStart + '-' + venueEnd;
   var duration = parseInt(document.getElementById('export-round-duration')?.value) || 30;
-  var startParts = venueVal.split('-')[0].split(':');
+  var startParts = venueStart.split(':');
   var startTotal = (parseInt(startParts[0])||19)*60 + (parseInt(startParts[1])||0);
   
   function fmt(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
@@ -2704,7 +2712,8 @@ function saveState() {
     var data = {
       players: players,
       date: document.getElementById('export-date')?.value,
-      venueTime: document.getElementById('export-venue-time')?.value,
+      venueStart: document.getElementById('venue-start')?.value,
+      venueEnd: document.getElementById('venue-end')?.value,
       duration: document.getElementById('export-round-duration')?.value,
       minDB: document.getElementById('min-db')?.value,
       minWB: document.getElementById('min-wb')?.value,
@@ -2713,6 +2722,12 @@ function saveState() {
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch(e) {}
+}
+
+function fmtDate(d) {
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var dd = String(d.getDate()).padStart(2,'0');
+  return d.getFullYear()+'-'+mm+'-'+dd;
 }
 
 function loadState() {
@@ -2727,7 +2742,8 @@ function loadState() {
       });
     }
     if (data.date) document.getElementById('export-date').value = data.date;
-    if (data.venueTime) document.getElementById('export-venue-time').value = data.venueTime;
+    if (data.venueStart) document.getElementById('venue-start').value = data.venueStart;
+    if (data.venueEnd) document.getElementById('venue-end').value = data.venueEnd;
     if (data.duration) document.getElementById('export-round-duration').value = data.duration;
     if (data.minDB) document.getElementById('min-db').value = data.minDB;
     if (data.minWB) document.getElementById('min-wb').value = data.minWB;
@@ -2759,8 +2775,27 @@ document.querySelectorAll('.mode-btn').forEach(function(btn) {
   btn.addEventListener('click', autoSave);
 });
 
+// Reset button
+document.getElementById('reset-players-btn').addEventListener('click', function() {
+  if (!confirm('\u786E\u5B9A\u8981\u6E05\u9664\u6240\u6709\u9009\u624B\u4FE1\u606F\u5417\uFF1F')) return;
+  players.length = 0;
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  localStorage.removeItem(STORAGE_KEY);
+  hideError();
+  document.getElementById('success-msg').textContent = '\u2705 \u5DF2\u6062\u590D\u9ED8\u8BA4\u9009\u624B';
+  document.getElementById('success-msg').classList.add('show');
+  autoSave();
+});
+
 // Date/time/min inputs save
-['export-date','export-venue-time','export-round-duration','min-db','min-wb','min-mx'].forEach(function(id) {
+['export-date','venue-start','venue-end','export-round-duration','min-db','min-wb','min-mx'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) el.addEventListener('input', autoSave);
 });
@@ -2777,6 +2812,12 @@ if (!loadState()) {
   addPlayer('\u5973', '', 3.0);
   addPlayer('\u5973', '', 3.0);
   addPlayer('\u5973', '', 3.0);
+}
+
+// Set default date to today if not loaded
+var dateInput = document.getElementById('export-date');
+if (dateInput && !dateInput.value) {
+  dateInput.value = fmtDate(new Date());
 }
 </script>
 </body>
