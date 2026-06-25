@@ -284,7 +284,58 @@
   .summary-line strong { color: #333; }
 
   .empty-hint { text-align: center; padding: 40px 20px; color: var(--gray); }
+  .round-section { margin-bottom: 16px; border: 1px solid var(--gray-light); border-radius: 6px; overflow: hidden; }
+  .round-section-header { display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--green-bg); font-weight:600; font-size:14px; color:var(--green-dark); border-bottom:2px solid var(--green-light); }
+  .round-section .match-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .round-section .match-table th { background:#f5f5f5; color:#555; padding:6px 12px; text-align:left; font-weight:500; border-bottom:1px solid var(--gray-light); font-size:12px; }
+  .round-section .match-table td { padding:6px 12px; border-bottom:1px solid #f0f0f0; }
+  .round-section .match-table tr:hover td { background:var(--green-pale); }
+  .tab-btn.dragging { opacity: 0.4; }
+  .sheetjs-warn { display:none; }
+  .tab-btn[draggable="true"] { cursor: grab; }
+  .tab-btn[draggable="true"]:active { cursor: grabbing; }
+  input[type="number"]::-webkit-inner-spin-button { opacity: 0.5; }
   .scroll-x { overflow-x: auto; }
+
+  /* Mode selector */
+  .mode-selector {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 14px;
+    padding: 10px 0 2px;
+    flex-wrap: wrap;
+  }
+  .mode-selector .mode-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray);
+    margin-right: 4px;
+  }
+  .mode-btn {
+    padding: 5px 14px;
+    border: 1px solid var(--gray-light);
+    border-radius: 14px;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #555;
+  }
+  .mode-btn:hover { border-color: var(--green-light); color: var(--green); }
+  .mode-btn.active {
+    background: var(--green);
+    color: #fff;
+    border-color: var(--green);
+  }
+  .mode-btn .mode-sub {
+    display: block;
+    font-size: 10px;
+    color: var(--gray);
+    font-weight: 400;
+    margin-top: 1px;
+  }
+  .mode-btn.active .mode-sub { color: rgba(255,255,255,0.75); }
 </style>
 </head>
 <body>
@@ -292,7 +343,7 @@
 
   <div class="header">
     <h1>🎾 网球双打排阵</h1>
-    <p>输入选手名单，自动生成 5 轮排阵 · 支持指定对阵/组队</p>
+    <p>输入选手名单,自动生成 5 轮排阵 · 支持指定对阵/组队</p>
   </div>
 
   <!-- Help Section -->
@@ -304,19 +355,22 @@
     <div class="help-body" id="help-body">
       <div class="help-body-inner">
         <table>
-          <tr><td>👥 选手</td><td>点击 <span class="tag gr">＋ 添加选手</span> 逐行输入，每行选性别 + 填姓名。可增减</td></tr>
-          <tr><td>⚙️ 指定</td><td>勾选 <strong>「启用指定」</strong> 可添加排阵约束：<br>
+          <tr><td>👥 选手</td><td>点击 <span class="tag gr">+ 添加选手</span> 逐行输入,每行选性别 + 填姓名。可增减</td></tr>
+          <tr><td>⚙️ 指定</td><td>勾选 <strong>「启用指定」</strong> 可添加排阵约束:<br>
             <span class="tag bl">双人</span> 选 A+B → 指定 <strong>组队</strong> 或 <strong>对阵</strong><br>
             <span class="tag or">四人</span> 选 A+B vs C+D → 固定一场对阵<br>
-            约束不指定轮次，算法自动安排
+            约束不指定轮次,算法自动安排
           </td></tr>
-          <tr><td>🎾 生成</td><td>点击 <span class="tag gr">生成排阵</span>，自动计算 5 轮赛程</td></tr>
-          <tr><td>📋 结果</td><td>切换 <strong>第1~5轮</strong> 标签查看每轮对阵。📌 标记 = 指定匹配</td></tr>
+          <tr><td>🎯 偏好</td><td>选择 <strong>均衡/男双优先/混双优先</strong>;可设置各类型最低场次要求</td></tr>
+          <tr><td>🎾 生成</td><td>点击 <span class="tag gr">生成排阵</span>,自动计算赛程</td></tr>
+          <tr><td>🔢 轮次</td><td>生成后点 <strong>+添加轮次</strong> 继续排新轮次,最多10轮</td></tr>
+          <tr><td>🔄 排序</td><td>拖拽轮次标签可任意调换顺序</td></tr>
+          <tr><td>📋 结果</td><td>切换轮次标签查看每轮对阵。📌 标记 = 指定匹配</td></tr>
           <tr><td>🤝 搭档</td><td>按人展示男双/女双/混双搭档及配对数</td></tr>
-          <tr><td>📊 覆盖率</td><td>展示所有男选手间及女选手间的对阵覆盖率，缺阵列表</td></tr>
+          <tr><td>📊 覆盖率</td><td>展示所有男选手间及女选手间的对阵覆盖率,缺阵列表</td></tr>
         </table>
         <div style="margin-top:4px;font-size:12px;color:var(--gray);">
-          ⚡ 条件：男女人数均为偶数 · 总人数为4的倍数 · 每人5场 · 零重复搭档
+          ⚡ 条件:男女人数均为偶数 · 总人数为4的倍数 · 零重复搭档
         </div>
       </div>
     </div>
@@ -326,8 +380,36 @@
   <div class="card">
     <h2>选手名单 <span class="count-badge" id="count-badge"></span></h2>
     <div id="player-list"></div>
+    <div class="mode-selector">
+      <span class="mode-label">🎯 场次偏好</span>
+      <button class="mode-btn" data-mode="default">均衡<div class="mode-sub">默认</div></button>
+      <button class="mode-btn active" data-mode="doubles">男双/女双优先<div class="mode-sub">多打单性别</div></button>
+      <button class="mode-btn" data-mode="mixed">混双优先<div class="mode-sub">多打混双</div></button>
+    </div>
+    <!-- Date & Time -->
+    <div class="mode-selector" style="margin-top:0;padding-bottom:6px;">
+      <span class="mode-label">📅 日期时间</span>
+      <span style="font-size:13px;color:var(--gray);">日期</span>
+      <input type="text" id="export-date" value="6月25日" style="width:80px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:13px;color:var(--gray);">场地时间</span>
+      <input type="text" id="export-venue-time" value="19:00-22:00" style="width:100px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:13px;color:var(--gray);">每轮时长</span>
+      <input type="text" id="export-round-duration" value="30" style="width:40px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:12px;color:var(--gray);">分钟</span>
+    </div>
+    <!-- Minimum requirements -->
+    <div class="mode-selector" style="margin-top:0;padding-bottom:6px;">
+      <span class="mode-label">📐 最低场次</span>
+      <span style="font-size:13px;color:var(--gray);">男双 ≥</span>
+      <input type="number" id="min-db" min="0" value="0" style="width:48px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:13px;color:var(--gray);">女双 ≥</span>
+      <input type="number" id="min-wb" min="0" value="0" style="width:48px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+      <span style="font-size:13px;color:var(--gray);">混双 ≥</span>
+      <input type="number" id="min-mx" min="0" value="0" style="width:48px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
+    </div>
+    <input type="hidden" id="round-count" value="5">
     <div class="btn-group">
-      <button class="btn btn-add" id="add-btn">＋ 添加选手</button>
+      <button class="btn btn-add" id="add-btn">+ 添加选手</button>
       <button class="btn btn-generate" id="gen-btn">🎾 生成排阵</button>
     </div>
   </div>
@@ -351,9 +433,9 @@
       <div class="constraint-panel show" id="panel-pair">
         <div id="pair-con-list"></div>
         <div class="con-add-row">
-          <select id="pair-p1"><option value="">— 选择选手A —</option></select>
+          <select id="pair-p1"><option value="">- 选择选手A -</option></select>
           <span class="con-label">+</span>
-          <select id="pair-p2"><option value="">— 选择选手B —</option></select>
+          <select id="pair-p2"><option value="">- 选择选手B -</option></select>
           <select id="pair-rel" style="min-width:70px;">
             <option value="team">组队</option>
             <option value="opponent">对手</option>
@@ -389,14 +471,18 @@
     <div class="card">
       <h2>📋 排阵结果 <span id="relax-badge"></span></h2>
       <div class="summary-line" id="summary-line"></div>
-      <div class="tab-bar" id="tab-bar"></div>
-      <div class="scroll-x">
-        <table class="match-table" id="match-table">
-          <thead><tr><th>场地</th><th>场次</th><th>类型</th><th>对阵</th></tr></thead>
-          <tbody id="match-body"></tbody>
-        </table>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:13px;color:var(--gray);">共</span>
+        <span id="round-counter" style="font-size:14px;font-weight:600;color:var(--green);"></span>
+        <span style="font-size:13px;color:var(--gray);">轮</span>
+        <button class="btn btn-sm btn-outline" id="add-round-btn" title="添加轮次" style="font-size:12px;padding:4px 12px;">+ 添加轮次</button>
+        <span style="font-size:11px;color:var(--gray);margin-left:8px;">↕ 拖拽轮次标题可调整顺序</span>
       </div>
-      <div class="seed-info" id="seed-info"></div>
+      <div id="all-rounds-container" style="overflow-x:auto;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+        <div class="seed-info" id="seed-info"></div>
+        <button class="btn btn-sm btn-generate" id="export-btn" style="font-size:12px;padding:5px 14px;">📥 导出Excel</button>
+      </div>
     </div>
 
     <div class="card">
@@ -412,6 +498,7 @@
 
 </div>
 
+<script src="exceljs.min.js"></script>
 <script>
 // ==================== Algorithm ====================
 
@@ -463,119 +550,271 @@ PRESETS['4,4'] = [
   [5,'MX',[0,2],[1,3]],[5,'MX',[2,1],[3,0]]
 ];
 
-function constructDist(M, W) {
+function getAllDists(M, W, N) {
+  N = N || 5;
   const cp = (M + W) / 4;
-  for (const c1 of [1, 2, 0]) {
+  const candidates = [];
+  // Uniform: N identical rounds
+  for (const c1 of [0, 1, 2]) {
     if (c1 > cp) continue;
     if ((M - 2 * c1) % 4 === 0 && (W - 2 * c1) % 4 === 0) {
       const a = (M - 2 * c1) / 4, b = (W - 2 * c1) / 4;
-      if (a >= 0 && b >= 0 && a + b + c1 === cp)
-        return [[a, b, c1], [a, b, c1], [a, b, c1], [a, b, c1], [a, b, c1]];
+      if (a >= 0 && b >= 0 && a + b + c1 === cp) {
+        candidates.push({
+          dist: Array.from({length: N}, () => [a, b, c1]),
+          a: a * N, b: b * N, c: c1 * N, uniform: true
+        });
+      }
     }
   }
-  const combos = [[0,2],[1,0],[2,0],[0,1],[1,2],[2,1]];
+  // Mixed: two different round types
+  const combos = [];
+  for (let ci = 0; ci <= cp; ci++)
+    for (let cj = 0; cj <= cp; cj++)
+      if (ci !== cj) combos.push([ci, cj]);
   for (const [c1, c2] of combos) {
     if (c1 > cp || c2 > cp) continue;
     const a1 = (M - 2 * c1) / 4, b1 = (W - 2 * c1) / 4;
     const a2 = (M - 2 * c2) / 4, b2 = (W - 2 * c2) / 4;
     if (a1 < 0 || b1 < 0 || a2 < 0 || b2 < 0) continue;
+    if (a1 % 1 !== 0 || b1 % 1 !== 0 || a2 % 1 !== 0 || b2 % 1 !== 0) continue;
     if (a1 + b1 + c1 !== cp || a2 + b2 + c2 !== cp) continue;
-    for (let n1 = 1; n1 < 5; n1++) {
-      const n2 = 5 - n1;
+    for (let n1 = 1; n1 < N; n1++) {
+      const n2 = N - n1;
       const sc = n1 * c1 + n2 * c2;
-      const sa = (5 * M - 2 * sc) / 4, sb = (5 * W - 2 * sc) / 4;
+      const sa = (N * M - 2 * sc) / 4, sb = (N * W - 2 * sc) / 4;
       if (n1 * a1 + n2 * a2 === sa && n1 * b1 + n2 * b2 === sb) {
         const d = [];
         for (let i = 0; i < n1; i++) d.push([a1, b1, c1]);
         for (let i = 0; i < n2; i++) d.push([a2, b2, c2]);
-        shuffle(d);
-        return d;
+        candidates.push({
+          dist: d,
+          a: a1 * n1 + a2 * n2,
+          b: b1 * n1 + b2 * n2,
+          c: c1 * n1 + c2 * n2,
+          uniform: false
+        });
       }
     }
   }
-  return null;
+  return candidates;
 }
 
-function flexPair(players, used, maxT, forcedTeams) {
+function sortDistsByMode(candidates, mode) {
+  if (candidates.length === 0) return [];
+  if (mode === 'default') {
+    const result = [];
+    for (const c1 of [1, 2, 0]) {
+      const found = candidates.filter(c => c.uniform && Math.round(c.c / 5) === c1);
+      for (const f of found) if (!result.includes(f)) result.push(f);
+    }
+    const mixed = candidates.filter(c => !c.uniform);
+    shuffle(mixed);
+    for (const m of mixed) result.push(m);
+    return result;
+  }
+  if (mode === 'doubles') {
+    const valid = candidates.filter(c => c.c >= 1);
+    valid.sort((x, y) => (y.a + y.b) - (x.a + x.b) || x.c - y.c);
+    const rest = candidates.filter(c => c.c < 1);
+    rest.sort((x, y) => (y.a + y.b) - (x.a + x.b));
+    return [...valid, ...rest];
+  }
+  if (mode === 'mixed') {
+    const valid = candidates.filter(c => c.a >= 1 && c.b >= 1);
+    valid.sort((x, y) => y.c - x.c || (x.a + x.b) - (y.a + y.b));
+    const rest = candidates.filter(c => !(c.a >= 1 && c.b >= 1));
+    rest.sort((x, y) => y.c - x.c || (x.a + x.b) - (y.a + y.b));
+    return [...valid, ...rest];
+  }
+  return candidates;
+}
+
+function filterByMinRequirements(candidates, minDB, minWB, minMX) {
+  const hasMin = minDB > 0 || minWB > 0 || minMX > 0;
+  if (!hasMin) return { candidates, exact: true, suggestion: null };
+
+  const exact = candidates.filter(c => c.a >= minDB && c.b >= minWB && c.c >= minMX);
+  if (exact.length > 0) return { candidates: exact, exact: true, suggestion: null };
+
+  // No exact match - find closest by total difference
+  let bestDist = Infinity;
+  let bestCandidates = [];
+  let bestSuggestion = null;
+
+  for (const c of candidates) {
+    const dbDiff = Math.max(0, minDB - c.a);
+    const wbDiff = Math.max(0, minWB - c.b);
+    const mxDiff = Math.max(0, minMX - c.c);
+    const dist = dbDiff + wbDiff + mxDiff;
+
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestCandidates = [c];
+      bestSuggestion = { db: c.a, wb: c.b, mx: c.c, dbDiff, wbDiff, mxDiff };
+    } else if (dist === bestDist) {
+      bestCandidates.push(c);
+    }
+  }
+
+  return { candidates: bestCandidates, exact: false, suggestion: bestSuggestion };
+}
+
+function flexPair(players, used, maxT, forcedTeams, levels) {
   maxT = maxT || 1000;
   forcedTeams = forcedTeams || [];
-  // forcedTeams: [[a,b], ...] try to make these teams first
+  levels = levels || [];
   const pool = [...players];
-
-  for (let t = 0; t < maxT; t++) {
-    const order = shuffle([...pool]);
-    const pairs = [];
-    const seen = new Set();
-    let ok = true;
-
+  
+  var bestResult = null;
+  var bestScore = Infinity;
+  
+  // Score: pair level difference + match balance
+  function calcScore(pairList, matchList) {
+    var s = 0;
+    // Partner level difference
+    for (var pi = 0; pi < pairList.length; pi++) {
+      var a = pairList[pi][0], b = pairList[pi][1];
+      if (levels.length > 0) s += Math.abs((levels[a]||3.0) - (levels[b]||3.0));
+    }
+    // Match balance: difference between two teams' total levels
+    for (var mi = 0; mi < matchList.length; mi++) {
+      var t1 = matchList[mi][0], t2 = matchList[mi][1];
+      var sum1 = 0, sum2 = 0;
+      for (var pi = 0; pi < 2; pi++) {
+        if (levels.length > 0) sum1 += levels[t1[pi]] || 3.0;
+        if (levels.length > 0) sum2 += levels[t2[pi]] || 3.0;
+      }
+      s += Math.abs(sum1 - sum2) * 2;  // 对阵平衡权重2倍
+    }
+    return s;
+  }
+  
+  for (var t = 0; t < maxT; t++) {
+    var order = shuffle([...pool]);
+    var pairs = [];
+    var seen = new Set();
+    var ok = true;
+    
     // 1) Place forced teammate pairs
-    const remaining = [...order];
-    for (const ft of forcedTeams) {
-      const [a, b] = ft;
-      const ia = remaining.indexOf(a);
-      const ib = remaining.indexOf(b);
+    var remaining = [...order];
+    for (var fi = 0; fi < forcedTeams.length; fi++) {
+      var ft = forcedTeams[fi];
+      var a = ft[0], b = ft[1];
+      var ia = remaining.indexOf(a);
+      var ib = remaining.indexOf(b);
       if (ia === -1 || ib === -1) { ok = false; break; }
-      const key = Math.min(a, b) + ',' + Math.max(a, b);
+      var key = Math.min(a, b) + ',' + Math.max(a, b);
       if (used.has(key) || seen.has(key)) { ok = false; break; }
       pairs.push([a, b]);
       seen.add(key);
-      // Remove from remaining (higher index first to avoid shift issues)
       remaining.splice(Math.max(ia, ib), 1);
       remaining.splice(Math.min(ia, ib), 1);
     }
     if (!ok) continue;
-
-    // 2) Randomly pair remaining
-    let i = 0;
+    
+    // 2) Pair remaining: find level-closest partner
+    var i = 0;
     while (i < remaining.length) {
-      const p1 = remaining[i];
-      let found = false;
-      for (let j = i + 1; j < remaining.length; j++) {
-        const p2 = remaining[j];
-        const key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+      var p1 = remaining[i];
+      var found = false;
+      var bestJ = -1, bestDiff = Infinity;
+      
+      // First pass: find best partner by level proximity
+      for (var j = i + 1; j < remaining.length; j++) {
+        var p2 = remaining[j];
+        var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
         if (!used.has(key) && !seen.has(key)) {
-          pairs.push([p1, p2]);
-          seen.add(key);
-          remaining.splice(j, 1);
-          remaining.splice(i, 1);
-          found = true;
-          break;
+          var diff = levels.length > 0 ? Math.abs((levels[p1]||3.0) - (levels[p2]||3.0)) : 0;
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestJ = j;
+          }
         }
       }
+      
+      if (bestJ >= 0) {
+        var p2 = remaining[bestJ];
+        var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+        pairs.push([p1, p2]);
+        seen.add(key);
+        remaining.splice(bestJ, 1);
+        remaining.splice(i, 1);
+        found = true;
+      }
+      
       if (!found) { ok = false; break; }
     }
     if (!ok) continue;
-
-    // 3) Assemble matches: pair up consecutive teams
-    for (const s of seen) used.add(s);
-    shuffle(pairs);
-    const result = [];
-    for (let k = 0; k < pairs.length; k += 2)
-      result.push([pairs[k], pairs[k + 1]]);
-    return result;
+    
+    // 3) Assemble matches: optimize match order for balance
+    var shuffled = shuffle([...pairs]);
+    var matches = [];
+    for (var k = 0; k < shuffled.length; k += 2) {
+      matches.push([shuffled[k], shuffled[k + 1]]);
+    }
+    
+    // Score this arrangement
+    var score = calcScore(pairs, matches);
+    if (score < bestScore) {
+      bestScore = score;
+      bestResult = { pairs: pairs, matches: matches };
+    }
   }
-  return null;
+  
+  if (!bestResult) return null;
+  
+  // Use best result
+  for (var si = 0; si < bestResult.pairs.length; si++) {
+    var p = bestResult.pairs[si];
+    used.add(Math.min(p[0], p[1]) + ',' + Math.max(p[0], p[1]));
+  }
+  return bestResult.matches;
 }
 
-function flexMix(males, females, used, maxT, forcedPairs) {
+function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLevels) {
   maxT = maxT || 1000;
   forcedPairs = forcedPairs || [];
-  // forcedPairs: [[m,w], ...] try to make these mixed pairs first
-
-  for (let t = 0; t < maxT; t++) {
-    const ml = shuffle([...males]);
-    const fl = shuffle([...females]);
-    const pairs = [];
-    const seen = new Set();
-    let ok = true;
-
+  maleLevels = maleLevels || [];
+  femaleLevels = femaleLevels || [];
+  
+  var bestResult = null;
+  var bestScore = Infinity;
+  
+  function calcScore(pairList, matchList) {
+    var s = 0;
+    // Partner level difference
+    for (var pi = 0; pi < pairList.length; pi++) {
+      var m = pairList[pi][0], w = pairList[pi][1];
+      var ml = maleLevels[m] || 3.0;
+      var wl = femaleLevels[w] || 3.0;
+      s += Math.abs(ml - wl);
+    }
+    // Match balance
+    for (var mi = 0; mi < matchList.length; mi++) {
+      var t1 = matchList[mi][0], t2 = matchList[mi][1];
+      var sum1 = (maleLevels[t1[0]]||3.0) + (femaleLevels[t1[1]]||3.0);
+      var sum2 = (maleLevels[t2[0]]||3.0) + (femaleLevels[t2[1]]||3.0);
+      s += Math.abs(sum1 - sum2) * 2;
+    }
+    return s;
+  }
+  
+  for (var t = 0; t < maxT; t++) {
+    var ml = shuffle([...males]);
+    var fl = shuffle([...females]);
+    var pairs = [];
+    var seen = new Set();
+    var ok = true;
+    
     // 1) Place forced pairs
-    for (const fp of forcedPairs) {
-      const [m, w] = fp;
-      const im = ml.indexOf(m);
-      const iw = fl.indexOf(w);
+    for (var fi = 0; fi < forcedPairs.length; fi++) {
+      var fp = forcedPairs[fi];
+      var m = fp[0], w = fp[1];
+      var im = ml.indexOf(m);
+      var iw = fl.indexOf(w);
       if (im === -1 || iw === -1) { ok = false; break; }
-      const key = m + ',' + w;
+      var key = m + ',' + w;
       if (used.has(key) || seen.has(key)) { ok = false; break; }
       pairs.push([m, w]);
       seen.add(key);
@@ -583,34 +822,58 @@ function flexMix(males, females, used, maxT, forcedPairs) {
       fl.splice(iw, 1);
     }
     if (!ok) continue;
-
-    // 2) Pair remaining randomly
-    for (const m of ml) {
-      let found = false;
-      for (let fi = 0; fi < fl.length; fi++) {
-        const w = fl[fi];
-        const key = m + ',' + w;
+    
+    // 2) Find best level-matched partner for each male
+    for (var mi = 0; mi < ml.length; mi++) {
+      var m = ml[mi];
+      var found = false;
+      var bestFi = -1, bestDiff = Infinity;
+      
+      for (var wi = 0; wi < fl.length; wi++) {
+        var w = fl[wi];
+        var key = m + ',' + w;
         if (!used.has(key) && !seen.has(key)) {
-          pairs.push([m, w]);
-          seen.add(key);
-          fl.splice(fi, 1);
-          found = true;
-          break;
+          var diff = Math.abs((maleLevels[m]||3.0) - (femaleLevels[w]||3.0));
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestFi = wi;
+          }
         }
       }
+      
+      if (bestFi >= 0) {
+        var w = fl[bestFi];
+        var key = m + ',' + w;
+        pairs.push([m, w]);
+        seen.add(key);
+        fl.splice(bestFi, 1);
+        found = true;
+      }
+      
       if (!found) { ok = false; break; }
     }
     if (!ok) continue;
-
-    // 3) Assemble matches: pair up consecutive pairs
-    for (const s of seen) used.add(s);
-    shuffle(pairs);
-    const result = [];
-    for (let k = 0; k < pairs.length; k += 2)
-      result.push([pairs[k], pairs[k + 1]]);
-    return result;
+    
+    // 3) Assemble matches
+    var shuffled = shuffle([...pairs]);
+    var matches = [];
+    for (var k = 0; k < shuffled.length; k += 2) {
+      matches.push([shuffled[k], shuffled[k + 1]]);
+    }
+    
+    var score = calcScore(pairs, matches);
+    if (score < bestScore) {
+      bestScore = score;
+      bestResult = { pairs: pairs, matches: matches };
+    }
   }
-  return null;
+  
+  if (!bestResult) return null;
+  for (var si = 0; si < bestResult.pairs.length; si++) {
+    var p = bestResult.pairs[si];
+    used.add(p[0] + ',' + p[1]);
+  }
+  return bestResult.matches;
 }
 
 function checkPairs(matches) {
@@ -640,7 +903,7 @@ function countPairOccurrences(matches, type, p1, p2) {
   return count;
 }
 
-function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
+function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels) {
   // pairCons: [{p1,p2,rel}] for DB/WB
   // mixedCons: [{m,w,rel}] for MX  (rel: 'team'|'opponent')
   // fixedCons: [{a,b,c,d}] 4-player fixed match
@@ -667,7 +930,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
   // For fixed matches, try to allocate them
   const fixedRemaining = fixedCons ? [...fixedCons] : [];
 
-  for (let r = 0; r < 5; r++) {
+  for (let r = 0; r < N; r++) {
     let [a, b, c] = dist[r];
     let needDB = 4 * a, needWB = 4 * b, needMX = 2 * c;
 
@@ -739,7 +1002,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
         }
       } else {
         const usedForCheck = relax > 0 ? new Set() : usedDB;
-        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams);
+        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, maleLevels);
         if (!pp) return null;
 
         // Mark satisfied pair constraints (DB)
@@ -861,7 +1124,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
         }
       } else {
         const usedForCheck = relax > 0 ? new Set() : usedWB;
-        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams);
+        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, femaleLevels);
         if (!pp) return null;
 
         // Mark satisfied pair constraints (WB)
@@ -922,7 +1185,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
       }
 
       const usedForCheck = relax > 0 ? new Set() : usedMX;
-      const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs);
+      const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs, maleLevels, femaleLevels);
       if (!pp) return null;
 
       // Mark satisfied mixed constraints
@@ -966,7 +1229,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
     else if (type === 'WB') { for (const p of [...t1, ...t2]) fc[p]++; }
     else { mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++; }
   }
-  if (!mc.every(v => v === 5) || !fc.every(v => v === 5)) return null;
+  if (!mc.every(v => v === N) || !fc.every(v => v === N)) return null;
 
   // Verify pairs (with relaxation)
   if (relax <= 0) {
@@ -993,20 +1256,28 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax) {
   return matches;
 }
 
-function generate(M, W, tries, constraints, relax) {
+function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
   tries = tries || 3000;
   relax = relax || 0;
-  const key = M + ',' + W;
+  N = N || 5;
+  minDB = minDB || 0; minWB = minWB || 0; minMX = minMX || 0;
+  var key = M + ',' + W;
+  var mode = getMode();
+  
+  // Get levels
+  var levels = getLevels();
+  var maleLevels = levels.male, femaleLevels = levels.female;
 
-  // If no constraints, try presets
-  if ((!constraints || constraints.length === 0) && PRESETS[key]) {
+  // If no constraints, default mode, preset exists, and no min requirements
+  if ((!constraints || constraints.length === 0) && mode === 'default' && PRESETS[key] && N === 5 && minDB === 0 && minWB === 0 && minMX === 0) {
     const preset = PRESETS[key].map(m => [...m]);
-    return preset;
+    return { matches: preset, suggestion: null, exact: true };
   }
-
-  const dist = constructDist(M, W);
-  if (!dist) return null;
-  const isUniform = dist.every(d => d[0] === dist[0][0] && d[1] === dist[0][1] && d[2] === dist[0][2]);
+  const allDists = getAllDists(M, W, N);
+  if (allDists.length === 0) return null;
+  const { candidates: filteredCands, exact: exactMatch, suggestion } = filterByMinRequirements(allDists, minDB, minWB, minMX);
+  if (filteredCands.length === 0) return null;
+  const sorted = sortDistsByMode(filteredCands, mode);
 
   // Prepare constraints
   const pairCons = [];
@@ -1037,12 +1308,15 @@ function generate(M, W, tries, constraints, relax) {
     }
   }
 
-  for (let i = 0; i < tries; i++) {
-    const r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax);
-    if (r) {
-      // Verify constraints are actually met
-      const ok = verifyConstraints(r, M, W, constraints, relax);
-      if (ok) return r;
+  for (const cand of sorted) {
+    const isUniform = cand.uniform;
+    const dist = cand.dist;
+    for (let i = 0; i < tries; i++) {
+      const r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels);
+      if (r) {
+        const ok = verifyConstraints(r, M, W, constraints, relax);
+        if (ok) return { matches: r, suggestion, exact: exactMatch };
+      }
     }
   }
   return null;
@@ -1142,8 +1416,29 @@ let pairConstraints = [];
 let fixedConstraints = [];
 
 function nameOf(gender, idx) {
-  if (gender === 'M') return maleNames[idx] || ('M' + (idx + 1));
-  return femaleNames[idx] || ('W' + (idx + 1));
+  // Always read from the live players array
+  if (gender === 'M') {
+    const males = players.filter(p => p.gender === '\u7537');
+    return males[idx]?.name || ('M' + (idx + 1));
+  }
+  const females = players.filter(p => p.gender === '\u5973');
+  return females[idx]?.name || ('W' + (idx + 1));
+}
+
+function levelOf(gender, idx) {
+  if (gender === 'M') {
+    var males = players.filter(function(p){return p.gender==='男';});
+    return (males[idx] && males[idx].level) || 3.0;
+  }
+  var females = players.filter(function(p){return p.gender==='女';});
+  return (females[idx] && females[idx].level) || 3.0;
+}
+
+function getLevels() {
+  return {
+    male: players.filter(function(p){return p.gender==='男';}).map(function(p){return p.level||3.0;}),
+    female: players.filter(function(p){return p.gender==='女';}).map(function(p){return p.level||3.0;})
+  };
 }
 
 function updateCount() {
@@ -1158,21 +1453,24 @@ function renderPlayerList() {
   players.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'player-row';
-    row.innerHTML = `
-      <span class="row-num">${i + 1}</span>
-      <select>${['男', '女'].map(g =>
-        `<option value="${g}" ${p.gender === g ? 'selected' : ''}>${g}</option>`
-      ).join('')}</select>
-      <input type="text" placeholder="输入选手姓名" value="${p.name}">
-      <button class="del-btn" data-i="${i}">✕</button>
-    `;
-    row.querySelector('select').addEventListener('change', function() {
+    var lvls = [2.0,2.5,3.0,3.5,4.0,4.5,5.0];
+    var lvOpts = lvls.map(function(v){return '<option value="'+v+'"'+(p.level===v?' selected':'')+'>'+v+'</option>';}).join('');
+    row.innerHTML = '\n      <span class="row-num">' + (i+1) + '</span>\n      <select>' +
+      ['男','女'].map(function(g){return '<option value="'+g+'"'+(p.gender===g?' selected':'')+'>'+g+'</option>';}).join('') +
+      '</select>\n      <input type="text" placeholder="输入选手姓名" value="' + p.name + '">\n' +
+      '<select style="width:58px;padding:8px 4px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">' + lvOpts + '</select>\n' +
+      '<button class="del-btn" data-i="' + i + '">\u2715</button>\n    ';
+    row.querySelectorAll('select')[0].addEventListener('change', function() {
       players[i].gender = this.value;
       updateCount();
       refreshConstraintSelects();
     });
     row.querySelector('input').addEventListener('input', function() {
       players[i].name = this.value;
+      refreshConstraintSelects();
+    });
+    row.querySelectorAll('select')[1].addEventListener('change', function() {
+      players[i].level = parseFloat(this.value);
     });
     row.querySelector('.del-btn').addEventListener('click', function() {
       players.splice(i, 1);
@@ -1184,8 +1482,8 @@ function renderPlayerList() {
   });
 }
 
-function addPlayer(gender, name) {
-  players.push({ gender: gender || '男', name: name || '' });
+function addPlayer(gender, name, level) {
+  players.push({ gender: gender || '\u7537', name: name || '', level: level || 3.0 });
   renderPlayerList();
   updateCount();
   refreshConstraintSelects();
@@ -1217,7 +1515,7 @@ function getPlayerOptions(includeEmpty) {
 }
 
 function refreshConstraintSelects() {
-  const opts = ['<option value="">— 选择选手 —</option>', ...getPlayerOptions()].join('');
+  const opts = ['<option value="">- 选择选手 -</option>', ...getPlayerOptions()].join('');
   ['pair-p1', 'pair-p2'].forEach(id => {
     const sel = document.getElementById(id);
     const val = sel.value;
@@ -1225,7 +1523,7 @@ function refreshConstraintSelects() {
     sel.value = val;
   });
 
-  const opts2 = ['<option value="">—</option>', ...getPlayerOptions()].join('');
+  const opts2 = ['<option value="">- 选择选手 -</option>', ...getPlayerOptions()].join('');
   ['fixed-a', 'fixed-b', 'fixed-c', 'fixed-d'].forEach(id => {
     const sel = document.getElementById(id);
     const val = sel.value;
@@ -1240,8 +1538,8 @@ function renderPairConList() {
   const list = document.getElementById('pair-con-list');
   list.innerHTML = '';
   pairConstraints.forEach((c, i) => {
-    const p1Name = nameOf(c.gender === 'M' ? 'M' : 'W', c.p1);
-    const p2Name = nameOf(c.gender === 'M' ? 'W' : 'M', c.p2);
+    const p1Name = nameOf(c.sameGender ? c.gender : 'M', c.p1);
+    const p2Name = nameOf(c.sameGender ? c.gender : 'W', c.p2);
     const relLabel = c.rel === 'team' ? '组队' : '对阵';
     const genderLabel = c.sameGender ? (c.gender === 'M' ? '男' : '女') : '混';
     const tagClass = c.sameGender ? (c.gender === 'M' ? 'blue' : 'pink') : 'orange';
@@ -1370,14 +1668,14 @@ document.getElementById('add-fixed-con').addEventListener('click', () => {
   const mCount = genders.split('').filter(g => g === 'M').length;
   const wCount = 4 - mCount;
   if (mCount !== 0 && mCount !== 4 && mCount !== 2) {
-    showError('四人指定仅支持：全男/全女/两男两女（混双）');
+    showError('四人指定仅支持:全男/全女/两男两女(混双)');
     return;
   }
   if (mCount === 2) {
     // Check MX pattern: each team should have 1M + 1F
     // Team1 = A+B, Team2 = C+D
     if (ga.g === gb.g || gc.g === gd.g) {
-      showError('混双组队每队需一男一女（如 A男+B女 vs C男+D女）');
+      showError('混双组队每队需一男一女(如 A男+B女 vs C男+D女)');
       return;
     }
   }
@@ -1407,6 +1705,68 @@ function hideError() {
   document.getElementById('success-msg').classList.remove('show');
 }
 
+// ===== Generate State (for incremental rounds) =====
+let lastGenState = null; // stores M,W,matches,used sets for adding rounds
+
+function getMinInput(id) { return parseInt(document.getElementById(id).value) || 0; }
+
+function markConstrainedMatches(result, constraints) {
+  if (!constraints || constraints.length === 0) return;
+  for (const c of constraints) {
+    if (c.type === 'pair') {
+      for (const m of result) {
+        const [r, type, t1, t2] = m;
+        if (c.sameGender) {
+          const gender = c.gender || 'M';
+          if ((gender === 'M' && type !== 'DB') || (gender === 'W' && type !== 'WB')) continue;
+        } else {
+          if (type !== 'MX') continue;
+        }
+        if (c.rel === 'team') {
+          if (type === 'MX') {
+            if ((t1[0] === c.p1 && t1[1] === c.p2) || (t2[0] === c.p1 && t2[1] === c.p2))
+              m[4] = true;
+          } else {
+            if ((t1.includes(c.p1) && t1.includes(c.p2)) || (t2.includes(c.p1) && t2.includes(c.p2)))
+              m[4] = true;
+          }
+        } else {
+          if (type === 'MX') {
+            if ((t1[0] === c.p1 && t2[1] === c.p2) || (t2[0] === c.p1 && t1[1] === c.p2))
+              m[4] = true;
+          } else {
+            if ((t1.includes(c.p1) && t2.includes(c.p2)) || (t1.includes(c.p2) && t2.includes(c.p1)))
+              m[4] = true;
+          }
+        }
+      }
+    } else if (c.type === 'fixed') {
+      const a = c.a.i, b = c.b.i, cc = c.c.i, d = c.d.i;
+      for (const m of result) {
+        const [r, type, t1, t2] = m;
+        const typeMatch = (c.genders === 'MMMM') ? type === 'DB' :
+                          (c.genders === 'WWWW') ? type === 'WB' : type === 'MX';
+        if (!typeMatch) continue;
+        if (type === 'MX') {
+          if ((t1[0] === a && t1[1] === b && t2[0] === cc && t2[1] === d) ||
+              (t1[0] === cc && t1[1] === d && t2[0] === a && t2[1] === b))
+            m[4] = true;
+        } else {
+          if ((t1.includes(a) && t1.includes(b) && t2.includes(cc) && t2.includes(d)) ||
+              (t1.includes(cc) && t1.includes(d) && t2.includes(a) && t2.includes(b)))
+            m[4] = true;
+        }
+      }
+    }
+  }
+}
+
+function getOrderedRounds() {
+  // Get current tab order by reading tab buttons
+  const tabs = document.querySelectorAll('#tab-bar .tab-btn');
+  return Array.from(tabs).map(btn => parseInt(btn.dataset.round));
+}
+
 // ===== Generate =====
 
 document.getElementById('gen-btn').addEventListener('click', () => {
@@ -1415,13 +1775,15 @@ document.getElementById('gen-btn').addEventListener('click', () => {
   const wn = players.filter(p => p.gender === '女');
   const M = mn.length, W = wn.length;
 
-  if (players.length === 0) { showError('请先添加选手！'); return; }
-  for (const p of players) { if (!p.name.trim()) { showError('请为所有选手填写姓名！'); return; } }
-  if (M % 2 !== 0 || W % 2 !== 0) { showError('男女人数必须都是偶数（当前男' + M + '人，女' + W + '人）'); return; }
-  if ((M + W) % 4 !== 0) { showError('总人数必须是4的倍数（当前共' + (M+W) + '人）'); return; }
+  if (players.length === 0) { showError('请先添加选手!'); return; }
+  for (const p of players) { if (!p.name.trim()) { showError('请为所有选手填写姓名!'); return; } }
+  if (M % 2 !== 0 || W % 2 !== 0) { showError('男女人数必须都是偶数(当前男' + M + '人,女' + W + '人)'); return; }
+  if ((M + W) % 4 !== 0) { showError('总人数必须是4的倍数(当前共' + (M+W) + '人)'); return; }
 
   maleNames = mn.map(p => p.name.trim());
   femaleNames = wn.map(p => p.name.trim());
+
+  const currentRounds = currentRoundCount || 5;
 
   const constraintsEnabled = document.getElementById('constraint-toggle').checked;
   let constraints = [];
@@ -1429,95 +1791,86 @@ document.getElementById('gen-btn').addEventListener('click', () => {
     constraints = [...pairConstraints, ...fixedConstraints];
   }
 
+  const minDB = getMinInput('min-db');
+  const minWB = getMinInput('min-wb');
+  const minMX = getMinInput('min-mx');
+
   // Try strict first
-  let result = generate(M, W, 2000, constraints, 0);
+  let genResult = generate(M, W, 2000, constraints, 0, currentRounds, minDB, minWB, minMX);
   let relaxLevel = 0;
 
-  if (!result && constraints.length > 0) {
-    // Try relaxed (allow 1 repeat)
-    result = generate(M, W, 3000, constraints, 1);
+  if (!genResult && constraints.length > 0) {
+    genResult = generate(M, W, 3000, constraints, 1, currentRounds, minDB, minWB, minMX);
     relaxLevel = 1;
   }
-  if (!result && constraints.length > 0) {
-    // Try more relaxed (allow 2 repeats)
-    result = generate(M, W, 5000, constraints, 2);
+  if (!genResult && constraints.length > 0) {
+    genResult = generate(M, W, 5000, constraints, 2, currentRounds, minDB, minWB, minMX);
     relaxLevel = 2;
   }
 
-  if (!result) {
+  if (!genResult) {
     if (constraints.length > 0) {
-      showError('无法在满足指定约束的条件下生成排阵，请检查约束是否与人数组合冲突，或减少指定条件');
+      showError('无法在满足指定约束的条件下生成排阵,请检查约束是否与人数组合冲突,或减少指定条件');
     } else {
-      showError('无法生成排阵，当前算法不支持该人数组合');
+      showError('无法生成排阵,当前算法不支持该人数组合');
     }
     return;
   }
 
-  document.getElementById('success-msg').textContent = '✅ 排阵生成成功！' + (relaxLevel > 0 ? '（已放宽重复搭档限制，允许重复 ' + relaxLevel + ' 次）' : '');
+  const result = genResult.matches;
+  const exactMatch = genResult.exact;
+  const suggestion = genResult.suggestion;
+
+  let msg = '✅ 排阵生成成功!';
+  if (!exactMatch && suggestion) {
+    msg += '(无法完全满足最低场次要求,建议排布:男双' + suggestion.db + '·女双' + suggestion.wb + '·混双' + suggestion.mx + ')';
+  }
+  msg += (relaxLevel > 0 ? '(已放宽重复搭档限制,允许重复 ' + relaxLevel + ' 次)' : '');
+  document.getElementById('success-msg').textContent = msg;
   document.getElementById('success-msg').classList.add('show');
 
-  // Mark constrained matches
-  const constrainedSet = new Set();
-  if (constraints.length > 0) {
-    // Find which matches satisfy constraints
-    for (const c of constraints) {
-      if (c.type === 'pair') {
-        for (const m of result) {
-          const [r, type, t1, t2] = m;
-          if (c.sameGender) {
-            const gender = c.gender || 'M';
-            if ((gender === 'M' && type !== 'DB') || (gender === 'W' && type !== 'WB')) continue;
-          } else {
-            if (type !== 'MX') continue;
-          }
-          if (c.rel === 'team') {
-            if (type === 'MX') {
-              if ((t1[0] === c.p1 && t1[1] === c.p2) || (t2[0] === c.p1 && t2[1] === c.p2))
-                m[4] = true;
-            } else {
-              if ((t1.includes(c.p1) && t1.includes(c.p2)) || (t2.includes(c.p1) && t2.includes(c.p2)))
-                m[4] = true;
-            }
-          } else {
-            if (type === 'MX') {
-              if ((t1[0] === c.p1 && t2[1] === c.p2) || (t2[0] === c.p1 && t1[1] === c.p2))
-                m[4] = true;
-            } else {
-              if ((t1.includes(c.p1) && t2.includes(c.p2)) || (t1.includes(c.p2) && t2.includes(c.p1)))
-                m[4] = true;
-            }
-          }
-        }
-      } else if (c.type === 'fixed') {
-        const a = c.a.i, b = c.b.i, cc = c.c.i, d = c.d.i;
-        for (const m of result) {
-          const [r, type, t1, t2] = m;
-          const typeMatch = (c.genders === 'MMMM') ? type === 'DB' :
-                            (c.genders === 'WWWW') ? type === 'WB' : type === 'MX';
-          if (!typeMatch) continue;
-          if (type === 'MX') {
-            if ((t1[0] === a && t1[1] === b && t2[0] === cc && t2[1] === d) ||
-                (t1[0] === cc && t1[1] === d && t2[0] === a && t2[1] === b))
-              m[4] = true;
-          } else {
-            if ((t1.includes(a) && t1.includes(b) && t2.includes(cc) && t2.includes(d)) ||
-                (t1.includes(cc) && t1.includes(d) && t2.includes(a) && t2.includes(b)))
-              m[4] = true;
-          }
-        }
-      }
-    }
-  }
+  markConstrainedMatches(result, constraints);
 
-  showResult(result, M, W, relaxLevel, constraints);
+  // Store generation state for incremental round addition
+  lastGenState = buildGenState(M, W, result, currentRounds);
+
+  showResult(result, M, W, relaxLevel, constraints, currentRounds, !exactMatch, suggestion);
 });
 
-function showResult(matches, M, W, relaxLevel, constraints) {
+function buildGenState(M, W, matches, rounds) {
+  const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
+  const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
+
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    if (type === 'DB') {
+      for (const p of [...t1, ...t2]) mc[p]++;
+      usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+      usedDB.add(Math.min(...t2)+','+Math.max(...t2));
+    } else if (type === 'WB') {
+      for (const p of [...t1, ...t2]) fc[p]++;
+      usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+      usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+    } else {
+      mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++;
+      usedMX.add(t1[0]+','+t1[1]);
+      usedMX.add(t2[0]+','+t2[1]);
+    }
+  }
+  return { M, W, matches: [...matches], usedDB, usedWB, usedMX, mc, fc, rounds };
+}
+
+let currentRoundCount = 5;
+let MAX_ROUNDS = 10;
+
+function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, suggestion) {
   const el = document.getElementById('result');
   el.classList.add('show');
+  N = N || currentRoundCount;
+  currentRoundCount = N;
 
+  const cp = (M+W)/4;
   const totalMatches = matches.length;
-  const matchesPerRound = totalMatches / 5;
 
   // Relax badge
   const badge = document.getElementById('relax-badge');
@@ -1529,7 +1882,6 @@ function showResult(matches, M, W, relaxLevel, constraints) {
 
   // Summary
   let dbCount = 0, wbCount = 0, mxCount = 0;
-  const conCount = matches.filter(m => m[4]).length;
   for (const m of matches) {
     if (m[1] === 'DB') dbCount++;
     else if (m[1] === 'WB') wbCount++;
@@ -1538,70 +1890,208 @@ function showResult(matches, M, W, relaxLevel, constraints) {
   let conText = '';
   if (constraints && constraints.length > 0) {
     const satisfied = matches.filter(m => m[4]).length;
-    conText = ` · 📌 ${satisfied} 场指定匹配`;
+    conText = ' · \u{1F4CC} ' + satisfied + ' \u573A\u6307\u5B9A\u5339\u914D';
   }
-  document.getElementById('summary-line').innerHTML = `
-    <span>👥 男 ${M} 人 · 女 ${W} 人</span>
-    <span>🏸 ${dbCount} 男双 · ${wbCount} 女双 · ${mxCount} 混双</span>
-    <span>📅 ${matchesPerRound} 片场地 × 5 轮${conText}</span>
-  `;
+  let sugText = '';
+  if (showSuggestion && suggestion) {
+    sugText = ' · \u26A0\uFE0F \u5EFA\u8BAE\u6392\u5E03\uFF1A\u7537\u53CC' + suggestion.db + '\u00B7\u5973\u53CC' + suggestion.wb + '\u00B7\u6DF7\u53CC' + suggestion.mx;
+  }
+  document.getElementById('summary-line').innerHTML =
+    '<span>\u{1F464} \u7537 ' + M + ' \u4EBA \u00B7 \u5973 ' + W + ' \u4EBA</span>' +
+    '<span>\u{1F3F8} ' + dbCount + ' \u7537\u53CC \u00B7 ' + wbCount + ' \u5973\u53CC \u00B7 ' + mxCount + ' \u6DF7\u53CC</span>' +
+    '<span>\u{1F4C5} ' + cp + ' \u7247\u573A\u5730 \u00D7 ' + N + ' \u8F6E' + conText + sugText + '</span>';
 
-  // Tabs
-  const tabBar = document.getElementById('tab-bar');
-  tabBar.innerHTML = '';
-  for (let r = 0; r < 5; r++) {
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (r === currentRound ? ' active' : '');
-    btn.textContent = '第' + (r + 1) + '轮';
-    btn.addEventListener('click', () => {
-      currentRound = r;
-      renderRound(matches, r);
-      document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === r));
-    });
-    tabBar.appendChild(btn);
-  }
-  currentRound = 0;
-  renderRound(matches, 0);
+  // All rounds on one page
+  renderAllRounds(matches, N);
+
+  // Round counter
+  document.getElementById('round-counter').textContent = N + '/' + MAX_ROUNDS;
+  document.getElementById('add-round-btn').style.display = N < MAX_ROUNDS ? 'inline-block' : 'none';
 
   document.getElementById('seed-info').textContent =
-    '💡 ' + M + '男' + W + '女 · ' + (relaxLevel > 0 ? '放宽重复搭档限制' : '零重复搭档') + ' · 每人5场';
+    '💡 ' + M + '男' + W + '女 · ' + (relaxLevel > 0 ? '放宽重复搭档限制' : '零重复搭档') + ' · 每人' + N + '场';
 
   renderPartnerStats(matches, M, W);
   renderCoverage(matches, M, W);
 }
 
-function renderRound(matches, round) {
-  const matchesInRound = matches.filter(m => m[0] === round + 1);
-  const tbody = document.getElementById('match-body');
-  tbody.innerHTML = '';
-  let globalStart = 0;
-  for (let r = 0; r < round; r++) {
-    globalStart += matches.filter(m => m[0] === r + 1).length;
-  }
-  matchesInRound.forEach((m, i) => {
-    const [r, type, t1, t2, constrained] = m;
-    const gi = globalStart + i + 1;
-    let team1Str, team2Str;
-    if (type === 'DB') {
-      team1Str = nameOf('M', t1[0]) + ' + ' + nameOf('M', t1[1]);
-      team2Str = nameOf('M', t2[0]) + ' + ' + nameOf('M', t2[1]);
-    } else if (type === 'WB') {
-      team1Str = nameOf('W', t1[0]) + ' + ' + nameOf('W', t1[1]);
-      team2Str = nameOf('W', t2[0]) + ' + ' + nameOf('W', t2[1]);
-    } else {
-      team1Str = nameOf('M', t1[0]) + ' + ' + nameOf('W', t1[1]);
-      team2Str = nameOf('M', t2[0]) + ' + ' + nameOf('W', t2[1]);
+function renderAllRounds(matches, N) {
+  const container = document.getElementById('all-rounds-container');
+  container.innerHTML = '';
+  N = N || currentRoundCount;
+
+  for (let r = 0; r < N; r++) {
+    const matchesInRound = matches.filter(m => m[0] === r + 1);
+
+    const section = document.createElement('div');
+    section.className = 'round-section';
+    section.id = 'round-section-' + r;
+
+    // Round header with controls
+    const header = document.createElement('div');
+    header.className = 'round-section-header';
+    header.innerHTML = '<span>🎾 第' + (r + 1) + '轮 (' + matchesInRound.length + '场)</span>';
+    header.style.flex = '1';
+
+    // Drag label
+    const dragLabel = document.createElement('span');
+    dragLabel.textContent = '↕';
+    dragLabel.style.cssText = 'cursor:grab;font-size:16px;color:var(--gray);margin-left:auto;';
+    dragLabel.title = '拖拽调整轮次顺序';
+    dragLabel.draggable = true;
+    dragLabel.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', r);
+      dragLabel.style.opacity = '0.4';
+    });
+    dragLabel.addEventListener('dragend', () => dragLabel.style.opacity = '1');
+    header.appendChild(dragLabel);
+
+    // Delete button
+    if (N > 5) {
+      const delBtn = document.createElement('span');
+      delBtn.textContent = ' ×';
+      delBtn.style.cssText = 'cursor:pointer;font-size:16px;color:var(--red);font-weight:bold;margin-left:6px;';
+      delBtn.title = '删除本轮';
+      delBtn.addEventListener('click', () => deleteRound(r, matches, N));
+      header.appendChild(delBtn);
     }
-    const tr = document.createElement('tr');
-    if (constrained) tr.className = 'constrained-match';
-    tr.innerHTML = `
-      <td>🏟️ ${i + 1} 号场${constrained ? ' 📌' : ''}</td>
-      <td>第 ${gi} 场</td>
-      <td><span class="type-tag ${TYPE_CLASS[type]}">${TYPE_LABELS[type]}</span></td>
-      <td><strong>${team1Str}</strong> vs <strong>${team2Str}</strong></td>
-    `;
-    tbody.appendChild(tr);
-  });
+
+    section.appendChild(header);
+
+    // Handle drops for reordering
+    section.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      section.style.borderColor = 'var(--green)';
+    });
+    section.addEventListener('dragleave', () => {
+      section.style.borderColor = 'var(--gray-light)';
+    });
+    section.addEventListener('drop', (e) => {
+      e.preventDefault();
+      section.style.borderColor = 'var(--gray-light)';
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIdx = r;
+      if (fromIdx === toIdx) return;
+      swapRounds(fromIdx, toIdx, matches, N);
+    });
+
+    // Match table
+    if (matchesInRound.length > 0) {
+      const table = document.createElement('table');
+      table.className = 'match-table';
+      table.innerHTML = '<thead><tr><th>🏟️ 场地</th><th>类型</th><th>对阵</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+
+      matchesInRound.forEach((m, i) => {
+        const [round, type, t1, t2, constrained] = m;
+        let team1Str, team2Str;
+        let lv1 = 0, lv2 = 0;
+        if (type === 'DB') {
+          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('M', t1[1]) + '(' + levelOf('M', t1[1]) + ')';
+          team2Str = nameOf('M', t2[0]) + '(' + levelOf('M', t2[0]) + ')' + ' + ' + nameOf('M', t2[1]) + '(' + levelOf('M', t2[1]) + ')';
+          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
+          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
+        } else if (type === 'WB') {
+          team1Str = nameOf('W', t1[0]) + '(' + levelOf('W', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
+          team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
+          lv1 = levelOf('W', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+        } else {
+          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
+          team2Str = nameOf('M', t2[0]) + '(' + levelOf('M', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
+          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('M', t2[0]) + levelOf('W', t2[1]);
+        }
+        const diff = Math.abs(lv1 - lv2);
+        let diffIcon = '\u2694\uFE0F ';
+        if (diff > 0.5) diffIcon = '\u26A1 ';
+        if (diff > 1.5) diffIcon = '\u26A0\uFE0F ';
+        const diffText = diffIcon + lv1.toFixed(1) + ' vs ' + lv2.toFixed(1);
+        const tr = document.createElement('tr');
+        if (constrained) tr.style.backgroundColor = '#fff8e1';
+        tr.innerHTML = '<td>' + (i + 1) + ' 号场' + (constrained ? ' 📌' : '') + '</td>' +
+          '<td><span class="type-tag ' + TYPE_CLASS[type] + '">' + TYPE_LABELS[type] + '</span></td>' +
+          '<td><strong>' + team1Str + '</strong> vs <strong>' + team2Str + '</strong><br><small style="color:var(--gray);font-size:11px;">' + diffText + '</small></td>';
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      section.appendChild(table);
+    } else {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:20px;text-align:center;color:var(--gray);';
+      empty.textContent = '本轮无比赛';
+      section.appendChild(empty);
+    }
+
+    container.appendChild(section);
+  }
+}
+
+function swapRounds(fromIdx, toIdx, matches, N) {
+  const fromMs = matches.filter(m => m[0] === fromIdx + 1);
+  const toMs = matches.filter(m => m[0] === toIdx + 1);
+  for (const m of fromMs) m[0] = toIdx + 1;
+  for (const m of toMs) m[0] = fromIdx + 1;
+
+  // Update any state
+  if (lastGenState) {
+    lastGenState.matches = matches;
+  }
+
+  renderAllRounds(matches, N);
+
+  let dbC = 0, wbC = 0, mxC = 0;
+  for (const m of matches) {
+    if (m[1] === 'DB') dbC++;
+    else if (m[1] === 'WB') wbC++;
+    else mxC++;
+  }
+  const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
+  document.getElementById('summary-line').innerHTML =
+    '<span>\u{1F464} \u7537 ' + (lastGenState ? lastGenState.M : '?') + ' \u4EBA \u00B7 \u5973 ' + (lastGenState ? lastGenState.W : '?') + ' \u4EBA</span>' +
+    '<span>\u{1F3F8} ' + dbC + ' \u7537\u53CC \u00B7 ' + wbC + ' \u5973\u53CC \u00B7 ' + mxC + ' \u6DF7\u53CC</span>' +
+    '<span>\u{1F4C5} ' + cp + ' \u7247\u573A\u5730 \u00D7 ' + N + ' \u8F6E</span>';
+}
+
+function deleteRound(r, matches, N) {
+  const newMatches = matches.filter(m => m[0] !== r + 1);
+  for (const m of newMatches) {
+    if (m[0] > r + 1) m[0]--;
+  }
+
+  const newN = N - 1;
+  currentRoundCount = newN;
+
+  if (lastGenState) {
+    lastGenState.matches = newMatches;
+    lastGenState.rounds = newN;
+  }
+
+  hideError();
+  document.getElementById('success-msg').textContent = '\u2705 \u5DF2\u5220\u9664\u7B2C ' + (r + 1) + ' \u8F6E\uFF0C\u5F53\u524D\u5269 ' + newN + ' \u8F6E';
+  document.getElementById('success-msg').classList.add('show');
+
+  let dbC = 0, wbC = 0, mxC = 0;
+  for (const m of newMatches) {
+    if (m[1] === 'DB') dbC++;
+    else if (m[1] === 'WB') wbC++;
+    else mxC++;
+  }
+  const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
+  document.getElementById('summary-line').innerHTML =
+    '<span>\u{1F464} \u7537 ' + (lastGenState ? lastGenState.M : '?') + ' \u4EBA \u00B7 \u5973 ' + (lastGenState ? lastGenState.W : '?') + ' \u4EBA</span>' +
+    '<span>\u{1F3F8} ' + dbC + ' \u7537\u53CC \u00B7 ' + wbC + ' \u5973\u53CC \u00B7 ' + mxC + ' \u6DF7\u53CC</span>' +
+    '<span>\u{1F4C5} ' + cp + ' \u7247\u573A\u5730 \u00D7 ' + newN + ' \u8F6E</span>';
+
+  renderAllRounds(newMatches, newN);
+  document.getElementById('round-counter').textContent = newN + '/' + MAX_ROUNDS;
+  document.getElementById('add-round-btn').style.display = newN < MAX_ROUNDS ? 'inline-block' : 'none';
+  document.getElementById('seed-info').textContent =
+    '\u{1F4A1} ' + (lastGenState ? lastGenState.M + '\u7537' + lastGenState.W + '\u5973' : '') + ' \u00B7 \u6BCF\u4EBA' + newN + '\u573A';
+
+  renderPartnerStats(newMatches, lastGenState ? lastGenState.M : 4, lastGenState ? lastGenState.W : 4);
+  renderCoverage(newMatches, lastGenState ? lastGenState.M : 4, lastGenState ? lastGenState.W : 4);
 }
 
 function renderPartnerStats(matches, M, W) {
@@ -1651,7 +2141,7 @@ function renderPartnerStats(matches, M, W) {
     card.className = 'stat-card';
     const dbP = fmtPartners(p.db, 'M');
     const mxP = fmtPartners(p.mx, 'W');
-    card.innerHTML = `<div class="name">👤 ${nameOf('M', i)}</div><div class="detail">${dbP ? `<div>🏸 男双队友：${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档：${mxP}</div>` : ''}</div>`;
+    card.innerHTML = `<div class="name">👤 ${nameOf('M', i)}</div><div class="detail">${dbP ? `<div>🏸 男双队友:${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档:${mxP}</div>` : ''}</div>`;
     grid.appendChild(card);
   }
   for (let i = 0; i < W; i++) {
@@ -1660,7 +2150,7 @@ function renderPartnerStats(matches, M, W) {
     card.className = 'stat-card';
     const dbP = fmtPartners(p.db, 'W');
     const mxP = fmtPartners(p.mx, 'M');
-    card.innerHTML = `<div class="name">👤 ${nameOf('W', i)}</div><div class="detail">${dbP ? `<div>🏸 女双队友：${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档：${mxP}</div>` : ''}</div>`;
+    card.innerHTML = `<div class="name">👤 ${nameOf('W', i)}</div><div class="detail">${dbP ? `<div>🏸 女双队友:${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档:${mxP}</div>` : ''}</div>`;
     grid.appendChild(card);
   }
 }
@@ -1696,13 +2186,13 @@ function renderCoverage(matches, M, W) {
   grid.innerHTML = `
     <div class="cov-box"><h3>🏸 男选手对阵</h3>
       <div class="stat ${mcActual === mcTotal ? '' : 'warn'}">${mcActual} / ${mcTotal}</div>
-      <div class="sub">${mcActual === mcTotal ? '✅ 全对阵！' : '⚡ 已对阵 ' + mcActual + ' 组'}</div>
-      ${mcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + mcMissing.length + ' 组：' + mcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖！</div>'}
+      <div class="sub">${mcActual === mcTotal ? '✅ 全对阵!' : '⚡ 已对阵 ' + mcActual + ' 组'}</div>
+      ${mcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + mcMissing.length + ' 组:' + mcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖!</div>'}
     </div>
     <div class="cov-box"><h3>🎾 女选手对阵</h3>
       <div class="stat ${fcActual === fcTotal ? '' : 'warn'}">${fcActual} / ${fcTotal}</div>
-      <div class="sub">${fcActual === fcTotal ? '✅ 全对阵！' : '⚡ 已对阵 ' + fcActual + ' 组'}</div>
-      ${fcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + fcMissing.length + ' 组：' + fcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖！</div>'}
+      <div class="sub">${fcActual === fcTotal ? '✅ 全对阵!' : '⚡ 已对阵 ' + fcActual + ' 组'}</div>
+      ${fcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + fcMissing.length + ' 组:' + fcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖!</div>'}
     </div>`;
 }
 
@@ -1714,15 +2204,406 @@ document.getElementById('help-toggle').addEventListener('click', function() {
   icon.classList.toggle('open');
 });
 
+// ==================== Mode selector ====================
+function getMode() {
+  const active = document.querySelector('.mode-btn.active');
+  return active ? active.dataset.mode : 'default';
+}
+
+// Mode button toggle
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// ==================== Add Round ====================
+
+document.getElementById('add-round-btn')?.addEventListener('click', function() {
+  if (!lastGenState) { showError('请先生成排阵'); return; }
+
+  const { M, W, matches: existing, usedDB, usedWB, usedMX, mc, fc, rounds } = lastGenState;
+  const newRoundIdx = rounds;
+
+  if (newRoundIdx >= MAX_ROUNDS) { showError('已达最大轮次上限 ' + MAX_ROUNDS); return; }
+
+  // Compute distribution for new round
+  const N = newRoundIdx + 1;
+  const cp = (M+W)/4;
+
+  // Count existing totals
+  let dbSum = 0, wbSum = 0, mxSum = 0;
+  for (const m of existing) {
+    if (m[1] === 'DB') dbSum++;
+    else if (m[1] === 'WB') wbSum++;
+    else mxSum++;
+  }
+
+  // Find total distribution for N rounds
+  const allDists = getAllDists(M, W, N);
+  if (allDists.length === 0) { showError('无法为 ' + N + ' 轮找到可行分布'); return; }
+
+  // Filter by mode
+  const sorted = sortDistsByMode(allDists, getMode());
+
+  let newRoundOK = false;
+  let newMatchesForRound = null;
+  let newState = null;
+
+  for (const cand of sorted) {
+    const { a: tA, b: tB, c: tC } = cand;
+    const aNew = tA - dbSum, bNew = tB - wbSum, cNew = tC - mxSum;
+
+    if (aNew < 0 || bNew < 0 || cNew < 0 || aNew + bNew + cNew !== cp) continue;
+
+    // Try to generate one round
+    const needDB = 4 * aNew, needWB = 4 * bNew, needMX = 2 * cNew;
+
+    // Count how many times each player has played
+    const newMc = [...mc], newFc = [...fc];
+    // All should have played exactly 'rounds' times
+
+    // Select players for DB
+    let roundMatches = [];
+    let ok = true;
+
+    // Build allowed players (those who can play one more time)
+    // Since each plays once per round, just use all players
+
+    // DB
+    let mxMlist = [];
+    if (needDB > 0) {
+      const dbCandidates = [...Array(M).keys()];
+      // Pick needDB players: prefer those who played fewer DB
+      const dbPicks = dbCandidates.sort((a,b) => newMc[a] - newMc[b]).slice(0, needDB);
+      const chosenSet = new Set(dbPicks);
+
+      const pairResult = flexPair(dbPicks, usedDB, 500);
+      if (!pairResult) { ok = false; continue; }
+
+      for (const [t1, t2] of pairResult) {
+        const k1 = Math.min(...t1)+','+Math.max(...t1);
+        const k2 = Math.min(...t2)+','+Math.max(...t2);
+        usedDB.add(k1); usedDB.add(k2);
+        roundMatches.push([newRoundIdx + 1, 'DB', t1, t2]);
+        for (const p of [...t1, ...t2]) newMc[p]++;
+      }
+      mxMlist = dbCandidates.filter(p => !chosenSet.has(p));
+    } else {
+      mxMlist = [...Array(M).keys()];
+    }
+
+    // WB
+    let mxFlist = [];
+    if (needWB > 0) {
+      const wbCandidates = [...Array(W).keys()];
+      const wbPicks = wbCandidates.sort((a,b) => newFc[a] - newFc[b]).slice(0, needWB);
+      const chosenSet = new Set(wbPicks);
+
+      const pairResult = flexPair(wbPicks, usedWB, 500);
+      if (!pairResult) { ok = false; continue; }
+
+      for (const [t1, t2] of pairResult) {
+        const k1 = Math.min(...t1)+','+Math.max(...t1);
+        const k2 = Math.min(...t2)+','+Math.max(...t2);
+        usedWB.add(k1); usedWB.add(k2);
+        roundMatches.push([newRoundIdx + 1, 'WB', t1, t2]);
+        for (const p of [...t1, ...t2]) newFc[p]++;
+      }
+      mxFlist = wbCandidates.filter(p => !chosenSet.has(p));
+    } else {
+      mxFlist = [...Array(W).keys()];
+    }
+
+    // MX
+    if (needMX > 0) {
+      const mixResult = flexMix(mxMlist, mxFlist, usedMX, 500);
+      if (!mixResult) { ok = false; continue; }
+
+      // But wait, needMX = 2*cNew means we need cNew MX matches
+      if (mixResult.length < cNew) { ok = false; continue; }
+
+      for (let i = 0; i < cNew; i++) {
+        const [t1, t2] = mixResult[i];
+        usedMX.add(t1[0]+','+t1[1]);
+        usedMX.add(t2[0]+','+t2[1]);
+        roundMatches.push([newRoundIdx + 1, 'MX', t1, t2]);
+        newMc[t1[0]]++; newMc[t2[0]]++;
+        newFc[t1[1]]++; newFc[t2[1]]++;
+      }
+    }
+
+    if (ok) {
+      newMatchesForRound = roundMatches;
+      newState = { M, W, usedDB, usedWB, usedMX, mc: newMc, fc: newFc };
+      newRoundOK = true;
+      break;
+    }
+  }
+
+  if (!newRoundOK) {
+    showError('无法为第 ' + (newRoundIdx + 1) + ' 轮生成有效排阵,需要放宽搭档限制或调整人数');
+    return;
+  }
+
+  // Append new round
+  const allMatches = [...existing, ...newMatchesForRound];
+
+  // Update state
+  lastGenState = { ...lastGenState, matches: allMatches, rounds: N, ...newState };
+
+  hideError();
+  document.getElementById('success-msg').textContent = '✅ 已添加第 ' + N + ' 轮!';
+  document.getElementById('success-msg').classList.add('show');
+
+  showResult(allMatches, M, W, 0, null, N, false, null);
+});
+
+// ==================== Export Excel ====================
+
+document.getElementById('export-btn')?.addEventListener('click', function() {
+  if (!lastGenState) { showError('请先生成排阵'); return; }
+
+  const { M, W, matches } = lastGenState;
+  if (!matches || matches.length === 0) { showError('没有排阵数据可导出'); return; }
+
+  try {
+    exportToExcel(matches, M, W, maleNames, femaleNames);
+  } catch(e) {
+    showError('导出失败:' + e.message);
+  }
+});
+
+function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
+  if (typeof ExcelJS === 'undefined') {
+    showError('导出模块未加载，请刷新页面后重试');
+    return;
+  }
+  
+  // ========== Read live names from players array ==========
+  var males = players.filter(function(p){return p.gender==='\u7537';});
+  var females = players.filter(function(p){return p.gender==='\u5973';});
+  var mLive = males.map(function(p){return p.name||'';});
+  var wLive = females.map(function(p){return p.name||'';});
+  
+  // ========== Format Config ==========
+  var colors = ['ECDAD4','E6ECD4','D1E0EF','EED2EE','E0EFD1','D2EEEE','F1F1CF','E0D1EF',
+    'FCE4D6','D6E4FC','E2EFDA','DAEEF3','F2DCDB','DBEEDB','E4DFEC','FDE9D9',
+    'D9E2F3','E2F0D9','EEE7D2','D1EFE0','EFD1E0','D2EED2','D9EED2','D2D2EE','EED2D2','EFE0D1'];
+  
+  // ========== Inputs ==========
+  var dateVal = document.getElementById('export-date')?.value || '6月25日';
+  var venueVal = document.getElementById('export-venue-time')?.value || '19:00-22:00';
+  var duration = parseInt(document.getElementById('export-round-duration')?.value) || 30;
+  var startParts = venueVal.split('-')[0].split(':');
+  var startTotal = (parseInt(startParts[0])||19)*60 + (parseInt(startParts[1])||0);
+  
+  function fmt(m) { return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+  function slot(idx) { var s=startTotal+idx*duration; return fmt(s)+'-'+fmt(s+duration); }
+  
+  // ========== Get player name ==========
+  function getPlayerName(match, teamIdx, playerIdx) {
+    var r, mtype, t1, t2;
+    r = match[0]; mtype = match[1]; t1 = match[2]; t2 = match[3];
+    var team = (teamIdx === 0) ? t1 : t2;
+    if (mtype === 'DB') return mLive[team[playerIdx]] || ('M' + (team[playerIdx] + 1));
+    if (mtype === 'WB') return wLive[team[playerIdx]] || ('W' + (team[playerIdx] + 1));
+    if (playerIdx === 0) return mLive[team[0]] || ('M' + (team[0] + 1));
+    return wLive[team[1]] || ('W' + (team[1] + 1));
+  }
+  
+  // Assign colors
+  var nameColors = {}, ci = 0;
+  matches.forEach(function(m) {
+    for (var t = 0; t < 2; t++)
+      for (var p = 0; p < 2; p++) {
+        var n = getPlayerName(m, t, p);
+        if (!nameColors[n]) nameColors[n] = colors[ci++ % colors.length];
+      }
+  });
+  
+  // Group by round
+  var typeLabel = {DB:'\u7537\u53CC', WB:'\u5973\u53CC', MX:'\u6DF7\u53CC'};
+  var groups = {};
+  matches.forEach(function(m) { var rn=m[0]; if(!groups[rn]) groups[rn]=[]; groups[rn].push(m); });
+  var rounds = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
+  
+  var maxCourts = 0;
+  rounds.forEach(function(rn) { if (groups[rn].length > maxCourts) maxCourts = groups[rn].length; });
+  if (maxCourts < 1) maxCourts = 1;
+  
+  // ========== Create workbook ==========
+  var wb = new ExcelJS.Workbook();
+  wb.creator = '\u7F51\u7403\u6392\u9635\u7CFB\u7EDF';
+  var ws = wb.addWorksheet('\u5BF9\u5C40\u5B89\u6392');
+  
+  // Column widths
+  ws.getColumn(1).width = 14;
+  ws.getColumn(2).width = 8;
+  for (var ci = 0; ci < maxCourts; ci++) {
+    ws.getColumn(3 + ci * 3).width = 7;
+    ws.getColumn(4 + ci * 3).width = 18;
+    ws.getColumn(5 + ci * 3).width = 18;
+  }
+  
+  var fontName = '\u7B49\u7EBF';
+  
+  // ========== Title Row ==========
+  var r1 = ws.getRow(1);
+  r1.height = 45;
+  ws.mergeCells(1, 1, 1, 2 + maxCourts * 3);
+  var titleCell = r1.getCell(1);
+  titleCell.value = dateVal + ' \u573A\u5730\u65F6\u95F4\uFF1A' + venueVal;
+  titleCell.font = {name: fontName, bold: true, size: 14};
+  titleCell.alignment = {horizontal: 'center', vertical: 'middle'};
+  
+  // ========== Header Row ==========
+  var r2 = ws.getRow(2);
+  r2.height = 38;
+  
+  function applyHdrStyle(cell) {
+    cell.font = {name: fontName, bold: true, size: 11, color: {argb: 'FFFFFFFF'}};
+    cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF1F4E79'}};
+    cell.alignment = {horizontal: 'center', vertical: 'middle', wrapText: true};
+    cell.border = {
+      top: {style:'thin', color:{argb:'FF999999'}},
+      bottom: {style:'thin', color:{argb:'FF999999'}},
+      left: {style:'thin', color:{argb:'FF999999'}},
+      right: {style:'thin', color:{argb:'FF999999'}}
+    };
+  }
+  
+  var c1 = r2.getCell(1); c1.value = '\u65F6\u95F4\u6BB5'; applyHdrStyle(c1);
+  var c2 = r2.getCell(2); c2.value = '\u573A\u6B21'; applyHdrStyle(c2);
+  
+  for (var ci = 0; ci < maxCourts; ci++) {
+    var colStart = 3 + ci * 3;
+    ws.mergeCells(2, colStart, 2, colStart + 2);
+    var cell = r2.getCell(colStart);
+    cell.value = '\u573A\u5730' + (ci+1);
+    applyHdrStyle(cell);
+    for (var cc = colStart + 1; cc <= colStart + 2; cc++) applyHdrStyle(r2.getCell(cc));
+  }
+  
+  // ========== Data Rows ==========
+  var borderStyle = {
+    top: {style:'thin', color:{argb:'FF999999'}},
+    bottom: {style:'thin', color:{argb:'FF999999'}},
+    left: {style:'thin', color:{argb:'FF999999'}},
+    right: {style:'thin', color:{argb:'FF999999'}}
+  };
+  var centerAlign = {horizontal: 'center', vertical: 'middle'};
+  
+  var curRow = 3;
+  rounds.forEach(function(rnd, idx) {
+    var ms = groups[rnd], ts = slot(idx);
+    var row1 = ws.getRow(curRow);
+    var row2 = ws.getRow(curRow + 1);
+    row1.height = 33;
+    row2.height = 33;
+    
+    // Time slot - merge 2 rows
+    ws.mergeCells(curRow, 1, curRow + 1, 1);
+    var tc = row1.getCell(1);
+    tc.value = ts;
+    tc.font = {name: fontName, size: 11};
+    tc.alignment = centerAlign;
+    tc.border = borderStyle;
+    row2.getCell(1).border = borderStyle;
+    
+    // Round number - merge 2 rows
+    ws.mergeCells(curRow, 2, curRow + 1, 2);
+    var rc = row1.getCell(2);
+    rc.value = rnd;
+    rc.font = {name: fontName, size: 11};
+    rc.alignment = centerAlign;
+    rc.border = borderStyle;
+    row2.getCell(2).border = borderStyle;
+    
+    // Each court
+    for (var ci = 0; ci < ms.length; ci++) {
+      var m = ms[ci];
+      var colStart = 3 + ci * 3;
+      
+      // Type - merge 2 rows
+      ws.mergeCells(curRow, colStart, curRow + 1, colStart);
+      var typeCell = row1.getCell(colStart);
+      typeCell.value = typeLabel[m[1]] || m[1];
+      typeCell.font = {name: fontName, size: 11};
+      typeCell.alignment = centerAlign;
+      typeCell.border = borderStyle;
+      row2.getCell(colStart).border = borderStyle;
+      
+      // Team 1 players
+      var p1cell = row1.getCell(colStart + 1);
+      var p2cell = row1.getCell(colStart + 2);
+      var name1a = getPlayerName(m, 0, 0);
+      var name1b = getPlayerName(m, 0, 1);
+      p1cell.value = name1a;
+      p2cell.value = name1b;
+      p1cell.font = {name: fontName, bold: true, size: 10};
+      p2cell.font = {name: fontName, bold: true, size: 10};
+      p1cell.alignment = centerAlign;
+      p2cell.alignment = centerAlign;
+      p1cell.border = borderStyle;
+      p2cell.border = borderStyle;
+      if (nameColors[name1a]) p1cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF' + nameColors[name1a]}};
+      if (nameColors[name1b]) p2cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF' + nameColors[name1b]}};
+      
+      // Team 2 players
+      var p3cell = row2.getCell(colStart + 1);
+      var p4cell = row2.getCell(colStart + 2);
+      var name2a = getPlayerName(m, 1, 0);
+      var name2b = getPlayerName(m, 1, 1);
+      p3cell.value = name2a;
+      p4cell.value = name2b;
+      p3cell.font = {name: fontName, bold: true, size: 10};
+      p4cell.font = {name: fontName, bold: true, size: 10};
+      p3cell.alignment = centerAlign;
+      p4cell.alignment = centerAlign;
+      p3cell.border = borderStyle;
+      p4cell.border = borderStyle;
+      if (nameColors[name2a]) p3cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF' + nameColors[name2a]}};
+      if (nameColors[name2b]) p4cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF' + nameColors[name2b]}};
+    }
+    
+    curRow += 2;
+  });
+  
+  // ========== Write file ==========
+  var now = new Date();
+  var ds = (now.getMonth()+1)+'-'+now.getDate()+'-'+now.getFullYear();
+  var fname = '\u7F51\u7403\u6392\u9635_' + ds + '.xlsx';
+  
+  wb.xlsx.writeBuffer().then(function(buffer) {
+    var blob = new Blob([buffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    hideError();
+    document.getElementById('success-msg').textContent = '\u2705 \u5DF2\u5BFC\u51FA ' + fname;
+    document.getElementById('success-msg').classList.add('show');
+  }).catch(function(err) {
+    showError('\u5BFC\u51FA\u5931\u8D25\uFF1A' + err.message);
+  });
+}
+
 // ==================== Init ====================
-addPlayer('男', '张三');
-addPlayer('男', '李四');
-addPlayer('男', '王五');
-addPlayer('男', '赵六');
-addPlayer('女', '孙七');
-addPlayer('女', '周八');
-addPlayer('女', '吴九');
-addPlayer('女', '郑十');
+addPlayer('男', '', 3.0);
+addPlayer('男', '', 3.0);
+addPlayer('男', '', 3.0);
+addPlayer('男', '', 3.0);
+addPlayer('女', '', 3.0);
+addPlayer('女', '', 3.0);
+addPlayer('女', '', 3.0);
+addPlayer('女', '', 3.0);
 </script>
 </body>
 </html>
