@@ -431,7 +431,7 @@
           <tr><td>🔢 轮次</td><td>生成后点 <strong>+添加轮次</strong> 继续排新轮次,最多10轮</td></tr>
           <tr><td>🔄 排序</td><td>拖拽轮次标签可任意调换顺序</td></tr>
           <tr><td>📋 结果</td><td>切换轮次标签查看每轮对阵。📌 标记 = 指定匹配</td></tr>
-          <tr><td>🤝 搭档</td><td>按人展示男双/女双/混双搭档及配对数</td></tr>
+          <tr><td>📊 统计</td><td>按人展示双打/混双的队友、对手及配对数</td></tr>
           <tr><td>📊 覆盖率</td><td>展示所有男选手间及女选手间的对阵覆盖率,缺阵列表</td></tr>
         </table>
         <div style="margin-top:4px;font-size:12px;color:var(--gray);">
@@ -2305,13 +2305,13 @@ function renderPartnerStats(matches, M, W) {
     card.className = 'stat-card';
     var html = '<div class="name">\u{1F464} ' + name + '</div><div class="detail">';
     var partnerPart = fmt(P.dbP, 'M');
-    if (partnerPart) html += '<div>\u{1F3F8} \u961F\u53CB: ' + partnerPart + '</div>';
+    if (partnerPart) html += '<div>\u{1F3BE} \u53CC\u6253\u961F\u53CB: ' + partnerPart + '</div>';
     var oppPart = fmt(P.dbO, 'M');
-    if (oppPart) html += '<div style="color:#888;">\u2694\uFE0F \u5BF9\u624B: ' + oppPart + '</div>';
+    if (oppPart) html += '<div style="color:#888;">\u{1F3BE} \u53CC\u6253\u5BF9\u624B: ' + oppPart + '</div>';
     var mxPP = fmt(P.mxP, 'W');
-    if (mxPP) html += '<div>\u{1F3AF} \u6DF7\u53CC\u642D\u6863: ' + mxPP + '</div>';
+    if (mxPP) html += '<div>\u{1F3BE} \u6DF7\u53CC\u642D\u6863: ' + mxPP + '</div>';
     var mxOP = fmt(P.mxO, 'W');
-    if (mxOP) html += '<div style="color:#888;">\u2694\uFE0F \u6DF7\u53CC\u5BF9\u624B: ' + mxOP + '</div>';
+    if (mxOP) html += '<div style="color:#888;">\u{1F3BE} \u6DF7\u53CC\u5BF9\u624B: ' + mxOP + '</div>';
     html += '</div>';
     card.innerHTML = html;
     return card;
