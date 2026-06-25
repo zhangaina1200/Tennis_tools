@@ -750,7 +750,12 @@ function flexPair(players, used, maxT, forcedTeams, levels) {
         if (levels.length > 0) sum1 += levels[t1[pi]] || 3.0;
         if (levels.length > 0) sum2 += levels[t2[pi]] || 3.0;
       }
-      s += Math.abs(sum1 - sum2) * 2;  // 对阵平衡权重2倍
+      var diff = Math.abs(sum1 - sum2);
+      if (diff > 0.5) {
+        s += diff * 20;  // 超过0.5重罚
+      } else {
+        s += diff * 2;
+      }
     }
     return s;
   }
@@ -860,7 +865,12 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
       var t1 = matchList[mi][0], t2 = matchList[mi][1];
       var sum1 = (maleLevels[t1[0]]||3.0) + (femaleLevels[t1[1]]||3.0);
       var sum2 = (maleLevels[t2[0]]||3.0) + (femaleLevels[t2[1]]||3.0);
-      s += Math.abs(sum1 - sum2) * 2;
+      var diff = Math.abs(sum1 - sum2);
+      if (diff > 0.5) {
+        s += diff * 20;  // 超过0.5重罚
+      } else {
+        s += diff * 2;
+      }
     }
     return s;
   }
@@ -1529,19 +1539,23 @@ function renderPlayerList() {
       players[i].gender = this.value;
       updateCount();
       refreshConstraintSelects();
+      autoSave();
     });
     row.querySelector('input').addEventListener('input', function() {
       players[i].name = this.value;
       refreshConstraintSelects();
+      autoSave();
     });
     row.querySelectorAll('select')[1].addEventListener('change', function() {
       players[i].level = parseFloat(this.value);
+      autoSave();
     });
     row.querySelector('.del-btn').addEventListener('click', function() {
       players.splice(i, 1);
       renderPlayerList();
       updateCount();
       refreshConstraintSelects();
+      autoSave();
     });
     list.appendChild(row);
   });
@@ -2660,15 +2674,89 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   });
 }
 
+// ==================== Save / Load ====================
+var STORAGE_KEY = 'tennis_scheduler_state';
+
+function saveState() {
+  try {
+    var data = {
+      players: players,
+      date: document.getElementById('export-date')?.value,
+      venueTime: document.getElementById('export-venue-time')?.value,
+      duration: document.getElementById('export-round-duration')?.value,
+      minDB: document.getElementById('min-db')?.value,
+      minWB: document.getElementById('min-wb')?.value,
+      minMX: document.getElementById('min-mx')?.value,
+      mode: getMode()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    var data = JSON.parse(raw);
+    if (data.players && data.players.length > 0) {
+      players.length = 0;
+      data.players.forEach(function(p) {
+        players.push({gender: p.gender || '\u7537', name: p.name || '', level: p.level || 3.0});
+      });
+    }
+    if (data.date) document.getElementById('export-date').value = data.date;
+    if (data.venueTime) document.getElementById('export-venue-time').value = data.venueTime;
+    if (data.duration) document.getElementById('export-round-duration').value = data.duration;
+    if (data.minDB) document.getElementById('min-db').value = data.minDB;
+    if (data.minWB) document.getElementById('min-wb').value = data.minWB;
+    if (data.minMX) document.getElementById('min-mx').value = data.minMX;
+    if (data.mode) {
+      document.querySelectorAll('.mode-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === data.mode);
+      });
+    }
+    renderPlayerList();
+    updateCount();
+    refreshConstraintSelects();
+    return true;
+  } catch(e) { return false; }
+}
+
+// Auto-save on change
+function autoSave() { setTimeout(saveState, 100); }
+
+// Hook into existing save points by wrapping addPlayer
+var origAddPlayer = addPlayer;
+addPlayer = function(gender, name, level) {
+  origAddPlayer(gender, name, level);
+  autoSave();
+};
+
+// Mode buttons save
+var origModeInit = document.querySelectorAll('.mode-btn').forEach;
+document.querySelectorAll('.mode-btn').forEach(function(btn) {
+  btn.addEventListener('click', autoSave);
+});
+
+// Date/time/min inputs save
+['export-date','export-venue-time','export-round-duration','min-db','min-wb','min-mx'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('input', autoSave);
+});
+
+window.addEventListener('beforeunload', saveState);
+
 // ==================== Init ====================
-addPlayer('男', '', 3.0);
-addPlayer('男', '', 3.0);
-addPlayer('男', '', 3.0);
-addPlayer('男', '', 3.0);
-addPlayer('女', '', 3.0);
-addPlayer('女', '', 3.0);
-addPlayer('女', '', 3.0);
-addPlayer('女', '', 3.0);
+if (!loadState()) {
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u7537', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+  addPlayer('\u5973', '', 3.0);
+}
 </script>
 </body>
 </html>
