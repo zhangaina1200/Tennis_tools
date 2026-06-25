@@ -295,6 +295,71 @@
   .tab-btn[draggable="true"] { cursor: grab; }
   .tab-btn[draggable="true"]:active { cursor: grabbing; }
   input[type="number"]::-webkit-inner-spin-button { opacity: 0.5; }
+  
+  /* ===== Responsive: Mobile ===== */
+  @media (max-width: 640px) {
+    body { padding: 10px; }
+    .card { padding: 14px 12px; }
+    .header { padding: 18px 12px; }
+    .header h1 { font-size: 20px; letter-spacing: 1px; }
+    .header p { font-size: 12px; }
+    .card h2 { font-size: 15px; margin-bottom: 10px; }
+    
+    .player-row { gap: 4px; margin-bottom: 6px; flex-wrap: nowrap; }
+    .player-row select { width: 50px; padding: 7px 4px; font-size: 13px; }
+    .player-row input { padding: 7px 8px; font-size: 13px; min-width: 0; }
+    .player-row .row-num { width: 18px; font-size: 11px; }
+    .player-row .del-btn { width: 28px; height: 28px; font-size: 16px; line-height: 28px; }
+    .player-row select[style*="width:58px"] { width: 46px !important; font-size: 12px; padding: 7px 2px; }
+    
+    .mode-selector { gap: 4px; padding: 6px 0; }
+    .mode-selector .mode-label { font-size: 12px; margin-right: 2px; }
+    .mode-btn { padding: 4px 10px; font-size: 12px; }
+    .mode-btn .mode-sub { font-size: 9px; }
+    .mode-selector input { font-size: 12px !important; }
+    
+    .btn { padding: 8px 16px; font-size: 14px; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    
+    .constraint-tab { padding: 5px 10px; font-size: 12px; }
+    .con-row { padding: 6px 8px; font-size: 12px; }
+    .con-row select { font-size: 12px; min-width: 60px; padding: 4px 6px; }
+    
+    .tab-btn { padding: 6px 14px; font-size: 13px; }
+    .round-section { margin-bottom: 10px; }
+    .round-section-header { padding: 6px 10px; font-size: 13px; }
+    .round-section .match-table { font-size: 12px; }
+    .round-section .match-table th,
+    .round-section .match-table td { padding: 5px 8px; }
+    .round-section .match-table td small { font-size: 10px !important; }
+    
+    .stats-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .stat-card { padding: 8px 10px; }
+    .cov-box { padding: 10px 12px; }
+    .cov-box .stat { font-size: 22px; }
+    
+    .summary-line { gap: 8px; font-size: 12px; }
+    .seed-info { font-size: 11px; }
+    
+    .constraint-section { margin-top: 6px; }
+    .constraint-panel .con-add-row { gap: 4px; }
+    .constraint-panel .con-add-row select { font-size: 12px; min-width: 50px; }
+    
+    #all-rounds-container { overflow-x: auto; }
+    #round-counter { font-size: 13px; }
+    
+    .btn-generate { width: 100%; text-align: center; }
+    #add-btn { width: 100%; text-align: center; }
+    .btn-group { flex-direction: column; gap: 8px; }
+  }
+  
+  @media (max-width: 480px) {
+    .player-row select { width: 44px; padding: 6px 2px; font-size: 12px; }
+    .player-row input { padding: 6px 6px; font-size: 12px; }
+    .player-row .row-num { display: none; }
+    .header h1 { font-size: 17px; }
+    .round-section .match-table td { padding: 4px 6px; font-size: 11px; }
+  }
   .scroll-x { overflow-x: auto; }
 
   /* Mode selector */
