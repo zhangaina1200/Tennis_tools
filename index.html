@@ -730,7 +730,7 @@ function filterByMinRequirements(candidates, minDB, minWB, minMX) {
   return { candidates: bestCandidates, exact: false, suggestion: bestSuggestion };
 }
 
-function flexPair(players, used, maxT, forcedTeams, levels) {
+function flexPair(players, used, maxT, forcedTeams, levels, maxCount, maxAllow) {
   maxT = maxT || 1000;
   forcedTeams = forcedTeams || [];
   levels = levels || [];
@@ -757,9 +757,9 @@ function flexPair(players, used, maxT, forcedTeams, levels) {
       }
       var diff = Math.abs(sum1 - sum2);
       if (diff > 0.5) {
-        s += diff * 20;  // 超过0.5重罚
+        s += diff * 100;  // 超过0.5极重罚
       } else {
-        s += diff * 2;
+        s += diff * 10;
       }
     }
     return s;
@@ -804,10 +804,16 @@ function flexPair(players, used, maxT, forcedTeams, levels) {
       for (var j = i + 1; j < remaining.length; j++) {
         var p2 = remaining[j];
         var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+        var ck = Math.min(p1, p2) + ',' + Math.max(p1, p2);
         if (!used.has(key) && !seen.has(key)) {
-          // Score = how far this pair's sum is from the target
           var pairSum = (levels[p1]||3.0) + (levels[p2]||3.0);
           var sc = Math.abs(pairSum - targetPerPair);
+          // maxCount penalty: prefer players who haven't interacted much
+          if (maxCount && maxCount.has(ck)) {
+            var cnt = maxCount.get(ck);
+            if (cnt >= (maxAllow||2)) continue; // hard block at limit
+            sc += cnt * 10; // soft penalty: less interaction preferred
+          }
           if (sc < bestLocal) {
             bestLocal = sc;
             bestJ = j;
@@ -854,7 +860,7 @@ function flexPair(players, used, maxT, forcedTeams, levels) {
   return bestResult.matches;
 }
 
-function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLevels) {
+function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLevels, maxCount, maxAllow) {
   maxT = maxT || 1000;
   forcedPairs = forcedPairs || [];
   maleLevels = maleLevels || [];
@@ -879,9 +885,9 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
       var sum2 = (maleLevels[t2[0]]||3.0) + (femaleLevels[t2[1]]||3.0);
       var diff = Math.abs(sum1 - sum2);
       if (diff > 0.5) {
-        s += diff * 20;  // 超过0.5重罚
+        s += diff * 100;  // 超过0.5极重罚
       } else {
-        s += diff * 2;
+        s += diff * 10;
       }
     }
     return s;
@@ -928,6 +934,11 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
         if (!used.has(key) && !seen.has(key)) {
           var pairSum = (maleLevels[m]||3.0) + (femaleLevels[w]||3.0);
           var sc = Math.abs(pairSum - targetPerPair);
+          if (maxCount && maxCount.has(key)) {
+            var cnt = maxCount.get(key);
+            if (cnt >= (maxAllow||2)) continue;
+            sc += cnt * 10;
+          }
           if (sc < bestLocal) {
             bestLocal = sc;
             bestFi = wi;
@@ -1007,12 +1018,15 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
   const sa = dist.reduce((s, d) => s + d[0], 0);
   const sb = dist.reduce((s, d) => s + d[1], 0);
   const dbTgt = new Array(M).fill(Math.floor(4 * sa / M));
-  for (let i = 0; i < (4 * sa) % M; i++) dbTgt[i]++;
+  var extraIdx = shuffle([...Array(M).keys()]);
+  for (var i = 0; i < (4 * sa) % M; i++) dbTgt[extraIdx[i]]++;
   const wbTgt = new Array(W).fill(Math.floor(4 * sb / W));
-  for (let i = 0; i < (4 * sb) % W; i++) wbTgt[i]++;
+  var extraIdxW = shuffle([...Array(W).keys()]);
+  for (var i = 0; i < (4 * sb) % W; i++) wbTgt[extraIdxW[i]]++;
 
   const dbLeft = [...dbTgt], wbLeft = [...wbTgt];
   const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
+  const maxCountDB = new Map(), maxCountWB = new Map(), maxCountMX = new Map();
   const rrDB = rrPairs(M), rrWB = rrPairs(W);
   const matches = [];
 
@@ -1096,7 +1110,8 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         }
       } else {
         const usedForCheck = relax > 0 ? new Set() : usedDB;
-        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, maleLevels);
+        var maxAllow = 2 + relax;
+        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, maleLevels, maxCountDB, maxAllow);
         if (!pp) { console.log('_go fail: flexPair DB round '+r); return null; }
 
         // Mark satisfied pair constraints (DB)
@@ -1158,6 +1173,16 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     if (needWB > 0) {
       let cand = [...Array(W).keys()].filter(p => wbLeft[p] > 0)
         .sort((p1, p2) => wbLeft[p2] - wbLeft[p1]);
+      // Shuffle within same wbLeft groups
+      for (var ci = 0; ci < cand.length;) {
+        var cj = ci;
+        while (cj < cand.length && wbLeft[cand[cj]] === wbLeft[cand[ci]]) cj++;
+        for (var sk = cj - 1; sk > ci; sk--) {
+          var sm = Math.floor(Math.random() * (sk - ci + 1)) + ci;
+          var tmp = cand[sk]; cand[sk] = cand[sm]; cand[sm] = tmp;
+        }
+        ci = cj;
+      }
       if (cand.length < needWB) { console.log('_go fail: needWB>cand'); return null; }
       let chosen = new Set(cand.slice(0, needWB));
 
@@ -1218,7 +1243,8 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         }
       } else {
         const usedForCheck = relax > 0 ? new Set() : usedWB;
-        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, femaleLevels);
+        var maxAllow = 2 + relax;
+        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, femaleLevels, maxCountWB, maxAllow);
         if (!pp) { console.log('_go fail: flexPair WB round '+r); return null; }
 
         // Mark satisfied pair constraints (WB)
@@ -1279,7 +1305,8 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
       }
 
       const usedForCheck = relax > 0 ? new Set() : usedMX;
-      const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs, maleLevels, femaleLevels);
+      var maxAllow = 2 + relax;
+      const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs, maleLevels, femaleLevels, maxCountMX, maxAllow);
       if (!pp) { console.log('_go fail: flexMix MX round '+r); return null; }
 
       // Mark satisfied mixed constraints
@@ -1311,6 +1338,41 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         usedMX.add(t1[0]+','+t1[1]);
         usedMX.add(t2[0]+','+t2[1]);
         matches.push([r+1, 'MX', t1, t2, ppCopy[pi]._fixed ? true : false]);
+      }
+    }
+
+    // Update maxCount for partner + opponent relationships in this round
+    for (var mi = matches.length - matches.filter(function(x){return x[0]===r+1;}).length; mi < matches.length; mi++) {
+      var rm = matches[mi];
+      var rt = rm[1], r1 = rm[2], r2 = rm[3];
+      if (rt === 'DB') {
+        var ck1 = Math.min(r1[0],r1[1])+','+Math.max(r1[0],r1[1]);
+        var ck2 = Math.min(r2[0],r2[1])+','+Math.max(r2[0],r2[1]);
+        maxCountDB.set(ck1, (maxCountDB.get(ck1)||0)+1);
+        maxCountDB.set(ck2, (maxCountDB.get(ck2)||0)+1);
+        for (var ai = 0; ai < 2; ai++) for (var bi = 0; bi < 2; bi++) {
+          var ok = Math.min(r1[ai],r2[bi])+','+Math.max(r1[ai],r2[bi]);
+          maxCountDB.set(ok, (maxCountDB.get(ok)||0)+1);
+        }
+      } else if (rt === 'WB') {
+        var ck1 = Math.min(r1[0],r1[1])+','+Math.max(r1[0],r1[1]);
+        var ck2 = Math.min(r2[0],r2[1])+','+Math.max(r2[0],r2[1]);
+        maxCountWB.set(ck1, (maxCountWB.get(ck1)||0)+1);
+        maxCountWB.set(ck2, (maxCountWB.get(ck2)||0)+1);
+        for (var ai = 0; ai < 2; ai++) for (var bi = 0; bi < 2; bi++) {
+          var ok = Math.min(r1[ai],r2[bi])+','+Math.max(r1[ai],r2[bi]);
+          maxCountWB.set(ok, (maxCountWB.get(ok)||0)+1);
+        }
+      } else {
+        var ck1 = r1[0]+','+r1[1];
+        var ck2 = r2[0]+','+r2[1];
+        maxCountMX.set(ck1, (maxCountMX.get(ck1)||0)+1);
+        maxCountMX.set(ck2, (maxCountMX.get(ck2)||0)+1);
+        // MX opponents: male vs male, female vs female across teams
+        var okM = Math.min(r1[0],r2[0])+','+Math.max(r1[0],r2[0]);
+        var okW = Math.min(r1[1],r2[1])+','+Math.max(r1[1],r2[1]);
+        maxCountMX.set(okM, (maxCountMX.get(okM)||0)+1);
+        maxCountMX.set(okW, (maxCountMX.get(okW)||0)+1);
       }
     }
   }
@@ -2204,61 +2266,59 @@ function renderPartnerStats(matches, M, W) {
   const grid = document.getElementById('stats-grid');
   grid.innerHTML = '';
   const mp = {}, wp = {};
-  for (let i = 0; i < M; i++) mp[i] = { db: {}, mx: {} };
-  for (let i = 0; i < W; i++) wp[i] = { db: {}, mx: {} };
+  for (let i = 0; i < M; i++) mp[i] = { dbP: {}, dbO: {}, mxP: {}, mxO: {} };
+  for (let i = 0; i < W; i++) wp[i] = { dbP: {}, dbO: {}, mxP: {}, mxO: {} };
+
+  function inc(obj, key) { obj[key] = (obj[key] || 0) + 1; }
 
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') {
-      incPartner(mp[t1[0]].db, t1[1], 'M');
-      incPartner(mp[t1[1]].db, t1[0], 'M');
-      incPartner(mp[t2[0]].db, t2[1], 'M');
-      incPartner(mp[t2[1]].db, t2[0], 'M');
+      inc(mp[t1[0]].dbP, 'M' + t1[1]); inc(mp[t1[1]].dbP, 'M' + t1[0]);
+      inc(mp[t2[0]].dbP, 'M' + t2[1]); inc(mp[t2[1]].dbP, 'M' + t2[0]);
+      // Opponents: team1 players vs team2 players
+      for (const a of t1) for (const b of t2) { inc(mp[a].dbO, 'M' + b); inc(mp[b].dbO, 'M' + a); }
     } else if (type === 'WB') {
-      incPartner(wp[t1[0]].db, t1[1], 'W');
-      incPartner(wp[t1[1]].db, t1[0], 'W');
-      incPartner(wp[t2[0]].db, t2[1], 'W');
-      incPartner(wp[t2[1]].db, t2[0], 'W');
+      inc(wp[t1[0]].dbP, 'W' + t1[1]); inc(wp[t1[1]].dbP, 'W' + t1[0]);
+      inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
+      for (const a of t1) for (const b of t2) { inc(wp[a].dbO, 'W' + b); inc(wp[b].dbO, 'W' + a); }
     } else {
-      incPartner(mp[t1[0]].mx, t1[1], 'W');
-      incPartner(wp[t1[1]].mx, t1[0], 'M');
-      incPartner(mp[t2[0]].mx, t2[1], 'W');
-      incPartner(wp[t2[1]].mx, t2[0], 'M');
+      inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
+      inc(mp[t2[0]].mxP, 'W' + t2[1]); inc(wp[t2[1]].mxP, 'M' + t2[0]);
+      // MX opponents: team1 vs team2
+      inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(wp[t2[1]].mxO, 'M' + t1[0]);
+      inc(mp[t2[0]].mxO, 'W' + t1[1]); inc(wp[t1[1]].mxO, 'M' + t2[0]);
     }
   }
 
-  function incPartner(obj, idx, prefix) {
-    const k = prefix + idx;
-    obj[k] = (obj[k] || 0) + 1;
-  }
-
-  function fmtPartners(obj, prefix) {
+  function fmt(obj, prefix) {
     const keys = Object.keys(obj);
-    if (keys.length === 0) return '暂无搭档';
+    if (keys.length === 0) return '';
     return keys.map(k => {
       const label = nameOf(prefix === 'M' ? 'M' : 'W', parseInt(k.replace(/[MW]/, '')));
-      return `<span>${label} ×${obj[k]}</span>`;
+      return '<span>' + label + ' \u00D7' + obj[k] + '</span>';
     }).join(' ');
   }
 
-  for (let i = 0; i < M; i++) {
-    const p = mp[i];
+  function makeCard(name, P, O) {
     const card = document.createElement('div');
     card.className = 'stat-card';
-    const dbP = fmtPartners(p.db, 'M');
-    const mxP = fmtPartners(p.mx, 'W');
-    card.innerHTML = `<div class="name">👤 ${nameOf('M', i)}</div><div class="detail">${dbP ? `<div>🏸 男双队友:${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档:${mxP}</div>` : ''}</div>`;
-    grid.appendChild(card);
+    var html = '<div class="name">\u{1F464} ' + name + '</div><div class="detail">';
+    var partnerPart = fmt(P.dbP, 'M');
+    if (partnerPart) html += '<div>\u{1F3F8} \u961F\u53CB: ' + partnerPart + '</div>';
+    var oppPart = fmt(P.dbO, 'M');
+    if (oppPart) html += '<div style="color:#888;">\u2694\uFE0F \u5BF9\u624B: ' + oppPart + '</div>';
+    var mxPP = fmt(P.mxP, 'W');
+    if (mxPP) html += '<div>\u{1F3AF} \u6DF7\u53CC\u642D\u6863: ' + mxPP + '</div>';
+    var mxOP = fmt(P.mxO, 'W');
+    if (mxOP) html += '<div style="color:#888;">\u2694\uFE0F \u6DF7\u53CC\u5BF9\u624B: ' + mxOP + '</div>';
+    html += '</div>';
+    card.innerHTML = html;
+    return card;
   }
-  for (let i = 0; i < W; i++) {
-    const p = wp[i];
-    const card = document.createElement('div');
-    card.className = 'stat-card';
-    const dbP = fmtPartners(p.db, 'W');
-    const mxP = fmtPartners(p.mx, 'M');
-    card.innerHTML = `<div class="name">👤 ${nameOf('W', i)}</div><div class="detail">${dbP ? `<div>🏸 女双队友:${dbP}</div>` : ''}${mxP ? `<div>🎯 混双搭档:${mxP}</div>` : ''}</div>`;
-    grid.appendChild(card);
-  }
+
+  for (let i = 0; i < M; i++) grid.appendChild(makeCard(nameOf('M', i), mp[i], null));
+  for (let i = 0; i < W; i++) grid.appendChild(makeCard(nameOf('W', i), wp[i], null));
 }
 
 function renderCoverage(matches, M, W) {
@@ -2382,7 +2442,7 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
     if (needDB > 0) {
       const dbCandidates = [...Array(M).keys()];
       // Pick needDB players: prefer those who played fewer DB
-      const dbPicks = dbCandidates.sort((a,b) => newMc[a] - newMc[b]).slice(0, needDB);
+      const dbPicks = shuffle(dbCandidates.filter(p => true)).sort((a,b) => newMc[a] - newMc[b]).slice(0, needDB);
       const chosenSet = new Set(dbPicks);
 
       const pairResult = flexPair(dbPicks, usedDB, 500);
@@ -2404,7 +2464,7 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
     let mxFlist = [];
     if (needWB > 0) {
       const wbCandidates = [...Array(W).keys()];
-      const wbPicks = wbCandidates.sort((a,b) => newFc[a] - newFc[b]).slice(0, needWB);
+      const wbPicks = shuffle(wbCandidates.filter(p => true)).sort((a,b) => newFc[a] - newFc[b]).slice(0, needWB);
       const chosenSet = new Set(wbPicks);
 
       const pairResult = flexPair(wbPicks, usedWB, 500);
