@@ -783,21 +783,28 @@ function flexPair(players, used, maxT, forcedTeams, levels) {
     }
     if (!ok) continue;
     
-    // 2) Pair remaining: find level-closest partner
+    // 2) Pair remaining: pick partner for best match balance
     var i = 0;
     while (i < remaining.length) {
       var p1 = remaining[i];
       var found = false;
-      var bestJ = -1, bestDiff = Infinity;
+      var bestJ = -1, bestLocal = Infinity;
       
-      // First pass: find best partner by level proximity
+      // Compute total level of remaining players
+      var sumRemaining = 0;
+      for (var ri = 0; ri < remaining.length; ri++) sumRemaining += (levels[remaining[ri]] || 3.0);
+      var numPairs = (remaining.length) / 2;
+      var targetPerPair = numPairs > 0 ? sumRemaining / numPairs : 0;
+      
       for (var j = i + 1; j < remaining.length; j++) {
         var p2 = remaining[j];
         var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
         if (!used.has(key) && !seen.has(key)) {
-          var diff = levels.length > 0 ? Math.abs((levels[p1]||3.0) - (levels[p2]||3.0)) : 0;
-          if (diff < bestDiff) {
-            bestDiff = diff;
+          // Score = how far this pair's sum is from the target
+          var pairSum = (levels[p1]||3.0) + (levels[p2]||3.0);
+          var sc = Math.abs(pairSum - targetPerPair);
+          if (sc < bestLocal) {
+            bestLocal = sc;
             bestJ = j;
           }
         }
@@ -832,7 +839,7 @@ function flexPair(players, used, maxT, forcedTeams, levels) {
     }
   }
   
-  if (!bestResult) return null;
+  if (!bestResult) { console.log('flexPair fail: all attempts failed'); return null; }
   
   // Use best result
   for (var si = 0; si < bestResult.pairs.length; si++) {
@@ -849,16 +856,16 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
   femaleLevels = femaleLevels || [];
   
   var bestResult = null;
-  var bestScore = Infinity;
+  var overallBest = Infinity;
   
   function calcScore(pairList, matchList) {
     var s = 0;
     // Partner level difference
     for (var pi = 0; pi < pairList.length; pi++) {
-      var m = pairList[pi][0], w = pairList[pi][1];
-      var ml = maleLevels[m] || 3.0;
-      var wl = femaleLevels[w] || 3.0;
-      s += Math.abs(ml - wl);
+      var pm = pairList[pi][0], pw = pairList[pi][1];
+      var pml = maleLevels[pm] || 3.0;
+      var pwl = femaleLevels[pw] || 3.0;
+      s += Math.abs(pml - pwl);
     }
     // Match balance
     for (var mi = 0; mi < matchList.length; mi++) {
@@ -898,19 +905,26 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
     }
     if (!ok) continue;
     
-    // 2) Find best level-matched partner for each male
+    // 2) Find best level-matched partner for each male (considering match balance)
     for (var mi = 0; mi < ml.length; mi++) {
       var m = ml[mi];
       var found = false;
-      var bestFi = -1, bestDiff = Infinity;
+      var bestFi = -1, bestLocal = Infinity;
+      
+      // Target: total remaining male+female level / number of pairs
+      var sumMale = 0, sumFemale = 0;
+      for (var ri = 0; ri < ml.length; ri++) sumMale += (maleLevels[ml[ri]]||3.0);
+      for (var ri = 0; ri < fl.length; ri++) sumFemale += (femaleLevels[fl[ri]]||3.0);
+      var targetPerPair = fl.length > 0 ? (sumMale + sumFemale) / ml.length : 0;
       
       for (var wi = 0; wi < fl.length; wi++) {
         var w = fl[wi];
         var key = m + ',' + w;
         if (!used.has(key) && !seen.has(key)) {
-          var diff = Math.abs((maleLevels[m]||3.0) - (femaleLevels[w]||3.0));
-          if (diff < bestDiff) {
-            bestDiff = diff;
+          var pairSum = (maleLevels[m]||3.0) + (femaleLevels[w]||3.0);
+          var sc = Math.abs(pairSum - targetPerPair);
+          if (sc < bestLocal) {
+            bestLocal = sc;
             bestFi = wi;
           }
         }
@@ -937,13 +951,13 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
     }
     
     var score = calcScore(pairs, matches);
-    if (score < bestScore) {
-      bestScore = score;
+    if (score < overallBest) {
+      overallBest = score;
       bestResult = { pairs: pairs, matches: matches };
     }
   }
   
-  if (!bestResult) return null;
+  if (!bestResult) { console.log('flexMix fail: all attempts failed'); return null; }
   for (var si = 0; si < bestResult.pairs.length; si++) {
     var p = bestResult.pairs[si];
     used.add(p[0] + ',' + p[1]);
@@ -1015,7 +1029,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
       let cand = [...Array(M).keys()].filter(p => dbLeft[p] > 0)
         .sort((p1, p2) => dbLeft[p2] - dbLeft[p1]);
 
-      if (cand.length < needDB) return null;
+      if (cand.length < needDB) { console.log('_go fail: needDB>cand'); return null; }
       let chosen = new Set(cand.slice(0, needDB));
 
       // Ensure constraint pair participants are in chosen (only if not yet satisfied)
@@ -1078,7 +1092,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
       } else {
         const usedForCheck = relax > 0 ? new Set() : usedDB;
         const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, maleLevels);
-        if (!pp) return null;
+        if (!pp) { console.log('_go fail: flexPair DB round '+r); return null; }
 
         // Mark satisfied pair constraints (DB)
         for (const [t1, t2] of pp) {
@@ -1139,7 +1153,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     if (needWB > 0) {
       let cand = [...Array(W).keys()].filter(p => wbLeft[p] > 0)
         .sort((p1, p2) => wbLeft[p2] - wbLeft[p1]);
-      if (cand.length < needWB) return null;
+      if (cand.length < needWB) { console.log('_go fail: needWB>cand'); return null; }
       let chosen = new Set(cand.slice(0, needWB));
 
       // Ensure pair constraint participants are selected (WB)
@@ -1200,7 +1214,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
       } else {
         const usedForCheck = relax > 0 ? new Set() : usedWB;
         const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, femaleLevels);
-        if (!pp) return null;
+        if (!pp) { console.log('_go fail: flexPair WB round '+r); return null; }
 
         // Mark satisfied pair constraints (WB)
         for (const [t1, t2] of pp) {
@@ -1261,7 +1275,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
 
       const usedForCheck = relax > 0 ? new Set() : usedMX;
       const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs, maleLevels, femaleLevels);
-      if (!pp) return null;
+      if (!pp) { console.log('_go fail: flexMix MX round '+r); return null; }
 
       // Mark satisfied mixed constraints
       for (const [t1, t2] of pp) {
@@ -1304,11 +1318,11 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     else if (type === 'WB') { for (const p of [...t1, ...t2]) fc[p]++; }
     else { mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++; }
   }
-  if (!mc.every(v => v === N) || !fc.every(v => v === N)) return null;
+  if (!mc.every(v => v === N) || !fc.every(v => v === N)) { console.log('_go fail: verify counts'); return null; }
 
   // Verify pairs (with relaxation)
   if (relax <= 0) {
-    if (!checkPairs(matches)) return null;
+    if (!checkPairs(matches)) { console.log('_go fail: checkPairs'); return null; }
   } else {
     // Relaxed check: allow repeated pairs up to (1 + relax) times
     const dbCount = {}, wbCount = {}, mxCount = {};
@@ -1323,7 +1337,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     const maxAllow = 1 + relax;
     for (const cnt of [dbCount, wbCount, mxCount]) {
       for (const v of Object.values(cnt)) {
-        if (v > maxAllow) return null;
+        if (v > maxAllow) { console.log('_go fail: relaxed check'); return null; }
       }
     }
   }
@@ -1383,14 +1397,19 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
     }
   }
 
-  for (const cand of sorted) {
-    const isUniform = cand.uniform;
-    const dist = cand.dist;
-    for (let i = 0; i < tries; i++) {
-      const r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels);
-      if (r) {
-        const ok = verifyConstraints(r, M, W, constraints, relax);
-        if (ok) return { matches: r, suggestion, exact: exactMatch };
+  for (var ci = 0; ci < sorted.length; ci++) {
+    var cand = sorted[ci];
+    var isUniform = cand.uniform;
+    var dist = cand.dist;
+    for (var i = 0; i < tries; i++) {
+      try {
+        var r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels);
+        if (r) {
+          var ok = verifyConstraints(r, M, W, constraints, relax);
+          if (ok) return { matches: r, suggestion: suggestion, exact: exactMatch };
+        }
+      } catch(e) {
+        console.error('_go error:', e.message);
       }
     }
   }
@@ -1874,17 +1893,20 @@ document.getElementById('gen-btn').addEventListener('click', () => {
   const minWB = getMinInput('min-wb');
   const minMX = getMinInput('min-mx');
 
-  // Try strict first
-  let genResult = generate(M, W, 2000, constraints, 0, currentRounds, minDB, minWB, minMX);
-  let relaxLevel = 0;
-
-  if (!genResult && constraints.length > 0) {
-    genResult = generate(M, W, 3000, constraints, 1, currentRounds, minDB, minWB, minMX);
-    relaxLevel = 1;
-  }
-  if (!genResult && constraints.length > 0) {
-    genResult = generate(M, W, 5000, constraints, 2, currentRounds, minDB, minWB, minMX);
-    relaxLevel = 2;
+  // Try strict first, then progressively relax
+  var genResult = null, relaxLevel = 0;
+  var relaxTries = [
+    {relax: 0, tries: 2000},
+    {relax: 1, tries: 3000},
+    {relax: 2, tries: 5000}
+  ];
+  
+  for (var ri = 0; ri < relaxTries.length; ri++) {
+    try {
+      genResult = generate(M, W, relaxTries[ri].tries, constraints, relaxTries[ri].relax, currentRounds, minDB, minWB, minMX);
+      relaxLevel = relaxTries[ri].relax;
+      if (genResult) break;
+    } catch(e) {}
   }
 
   if (!genResult) {
@@ -2733,7 +2755,6 @@ addPlayer = function(gender, name, level) {
 };
 
 // Mode buttons save
-var origModeInit = document.querySelectorAll('.mode-btn').forEach;
 document.querySelectorAll('.mode-btn').forEach(function(btn) {
   btn.addEventListener('click', autoSave);
 });
