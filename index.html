@@ -774,12 +774,10 @@ function flexPair(players, used, maxT, forcedTeams, levels, maxCount, maxAllow) 
   // Score: pair level difference + match balance
   function calcScore(pairList, matchList) {
     var s = 0;
-    // Partner level difference
     for (var pi = 0; pi < pairList.length; pi++) {
       var a = pairList[pi][0], b = pairList[pi][1];
       if (levels.length > 0) s += Math.abs((levels[a]||3.0) - (levels[b]||3.0));
     }
-    // Match balance: difference between two teams' total levels
     for (var mi = 0; mi < matchList.length; mi++) {
       var t1 = matchList[mi][0], t2 = matchList[mi][1];
       var sum1 = 0, sum2 = 0;
@@ -788,106 +786,91 @@ function flexPair(players, used, maxT, forcedTeams, levels, maxCount, maxAllow) 
         if (levels.length > 0) sum2 += levels[t2[pi]] || 3.0;
       }
       var diff = Math.abs(sum1 - sum2);
-      if (diff > 0.5) {
-        s += diff * 100;  // 超过0.5极重罚
-      } else {
-        s += diff * 10;
-      }
+      if (diff > 0.5) s += diff * 100; else s += diff * 10;
     }
     return s;
   }
   
-  for (var t = 0; t < maxT; t++) {
-    var order = shuffle([...pool]);
-    var pairs = [];
-    var seen = new Set();
-    var ok = true;
+  // Try strict mode first, then fallback to relaxed
+  var relaxMode = 0;
+  while (relaxMode <= 2 && !bestResult) {
+    var curUsed = relaxMode === 0 ? used : new Set();
+    var curMaxCount = (relaxMode >= 1) ? null : maxCount;
     
-    // 1) Place forced teammate pairs
-    var remaining = [...order];
-    for (var fi = 0; fi < forcedTeams.length; fi++) {
-      var ft = forcedTeams[fi];
-      var a = ft[0], b = ft[1];
-      var ia = remaining.indexOf(a);
-      var ib = remaining.indexOf(b);
-      if (ia === -1 || ib === -1) { ok = false; break; }
-      var key = Math.min(a, b) + ',' + Math.max(a, b);
-      if (used.has(key) || seen.has(key)) { ok = false; break; }
-      pairs.push([a, b]);
-      seen.add(key);
-      remaining.splice(Math.max(ia, ib), 1);
-      remaining.splice(Math.min(ia, ib), 1);
-    }
-    if (!ok) continue;
-    
-    // 2) Pair remaining: pick partner for best match balance
-    var i = 0;
-    while (i < remaining.length) {
-      var p1 = remaining[i];
-      var found = false;
-      var bestJ = -1, bestLocal = Infinity;
+    for (var t = 0; t < maxT; t++) {
+      var order = shuffle([...pool]);
+      var pairs = [];
+      var seen = new Set();
+      var ok = true;
       
-      // Compute total level of remaining players
-      var sumRemaining = 0;
-      for (var ri = 0; ri < remaining.length; ri++) sumRemaining += (levels[remaining[ri]] || 3.0);
-      var numPairs = (remaining.length) / 2;
-      var targetPerPair = numPairs > 0 ? sumRemaining / numPairs : 0;
+      var remaining = [...order];
+      for (var fi = 0; fi < forcedTeams.length; fi++) {
+        var ft = forcedTeams[fi];
+        var a = ft[0], b = ft[1];
+        var ia = remaining.indexOf(a);
+        var ib = remaining.indexOf(b);
+        if (ia === -1 || ib === -1) { ok = false; break; }
+        var key = Math.min(a, b) + ',' + Math.max(a, b);
+        if (curUsed.has(key) || seen.has(key)) { ok = false; break; }
+        pairs.push([a, b]); seen.add(key);
+        remaining.splice(Math.max(ia, ib), 1);
+        remaining.splice(Math.min(ia, ib), 1);
+      }
+      if (!ok) continue;
       
-      for (var j = i + 1; j < remaining.length; j++) {
-        var p2 = remaining[j];
-        var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
-        var ck = Math.min(p1, p2) + ',' + Math.max(p1, p2);
-        if (!used.has(key) && !seen.has(key)) {
-          var pairSum = (levels[p1]||3.0) + (levels[p2]||3.0);
-          var sc = Math.abs(pairSum - targetPerPair);
-          // maxCount penalty: prefer players who haven't interacted much
-          if (maxCount && maxCount.has(ck)) {
-            var cnt = maxCount.get(ck);
-            if (cnt >= (maxAllow||2)) continue; // hard block at limit
-            sc += cnt * 10; // soft penalty: less interaction preferred
-          }
-          if (sc < bestLocal) {
-            bestLocal = sc;
-            bestJ = j;
+      var i = 0;
+      while (i < remaining.length) {
+        var p1 = remaining[i];
+        var found = false;
+        var bestJ = -1, bestLocal = Infinity;
+        var sumRemaining = 0, numRem = remaining.length;
+        for (var ri = 0; ri < numRem; ri++) sumRemaining += (levels[remaining[ri]] || 3.0);
+        var targetPerPair = (numRem / 2) > 0 ? sumRemaining / (numRem / 2) : 0;
+        
+        for (var j = i + 1; j < remaining.length; j++) {
+          var p2 = remaining[j];
+          var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+          if (!curUsed.has(key) && !seen.has(key)) {
+            var pairSum = (levels[p1]||3.0) + (levels[p2]||3.0);
+            var sc = Math.abs(pairSum - targetPerPair);
+            if (curMaxCount && curMaxCount.has(key)) {
+              var cnt = curMaxCount.get(key);
+              if (cnt >= (maxAllow||2)) continue;
+              sc += cnt * 10;
+            }
+            if (sc < bestLocal) { bestLocal = sc; bestJ = j; }
           }
         }
+        
+        if (bestJ >= 0) {
+          var p2 = remaining[bestJ];
+          var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
+          pairs.push([p1, p2]); seen.add(key);
+          remaining.splice(bestJ, 1); remaining.splice(i, 1);
+          found = true;
+        }
+        if (!found) { ok = false; break; }
       }
+      if (!ok) continue;
       
-      if (bestJ >= 0) {
-        var p2 = remaining[bestJ];
-        var key = Math.min(p1, p2) + ',' + Math.max(p1, p2);
-        pairs.push([p1, p2]);
-        seen.add(key);
-        remaining.splice(bestJ, 1);
-        remaining.splice(i, 1);
-        found = true;
-      }
-      
-      if (!found) { ok = false; break; }
+      var shuffled = shuffle([...pairs]);
+      var arrMatches = [];
+      for (var k = 0; k < shuffled.length; k += 2) arrMatches.push([shuffled[k], shuffled[k + 1]]);
+      var score = calcScore(pairs, arrMatches);
+      if (score < bestScore) { bestScore = score; bestResult = { pairs: pairs, matches: arrMatches, relax: relaxMode }; }
     }
-    if (!ok) continue;
-    
-    // 3) Assemble matches: optimize match order for balance
-    var shuffled = shuffle([...pairs]);
-    var matches = [];
-    for (var k = 0; k < shuffled.length; k += 2) {
-      matches.push([shuffled[k], shuffled[k + 1]]);
-    }
-    
-    // Score this arrangement
-    var score = calcScore(pairs, matches);
-    if (score < bestScore) {
-      bestScore = score;
-      bestResult = { pairs: pairs, matches: matches };
-    }
+    relaxMode++;
+    if (relaxMode === 1) { maxT = Math.min(maxT * 2, 3000); } // More tries on fallback
   }
   
   if (!bestResult) { console.log('flexPair fail: all attempts failed'); return null; }
   
-  // Use best result
-  for (var si = 0; si < bestResult.pairs.length; si++) {
-    var p = bestResult.pairs[si];
-    used.add(Math.min(p[0], p[1]) + ',' + Math.max(p[0], p[1]));
+  // Track used pairs only in strict mode
+  if (bestResult.relax === 0) {
+    for (var si = 0; si < bestResult.pairs.length; si++) {
+      var p = bestResult.pairs[si];
+      used.add(Math.min(p[0], p[1]) + ',' + Math.max(p[0], p[1]));
+    }
   }
   return bestResult.matches;
 }
