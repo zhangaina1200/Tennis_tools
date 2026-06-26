@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -247,6 +247,9 @@
   .type-tag.db { background: var(--blue); }
   .type-tag.wb { background: #e91e63; }
   .type-tag.mx { background: var(--orange); }
+  .type-tag.xw { background: #8e24aa; }
+  .type-tag.xd { background: #6a1b9a; }
+  .type-tag.mb { background: #00897b; }
 
   .constrained-match td { background: #fff8e1 !important; }
   .constrained-match td:first-child::after { content: ' 📌'; font-size: 12px; }
@@ -624,45 +627,74 @@ function getAllDists(M, W, N) {
   N = N || 5;
   const cp = (M + W) / 4;
   const candidates = [];
+
+  // Detect special court needed (odd-odd, total multiple of 4)
+  let special = null; // null | 'XW' (MXxWB) | 'XD' (MXxDB)
+  let M_base = M, W_base = W;
+  if (M % 2 === 1 && W % 2 === 1 && (M + W) % 4 === 0) {
+    if (M % 4 === 1 && W % 4 === 3) {
+      special = 'XW';  // uses 1M+3W
+      M_base = M - 1; W_base = W - 3;
+    } else {  // M%4==3, W%4==1
+      special = 'XD';  // uses 3M+1W
+      M_base = M - 3; W_base = W - 1;
+    }
+  }
+
+  const remCp = cp - (special ? 1 : 0);
+
+  // Only special court (no standard courts)
+  if (remCp === 0 && special) {
+    candidates.push({
+      dist: Array.from({length: N}, () => [0, 0, 0, special]),
+      a: 0, b: 0, c: 0, uniform: true, special: true
+    });
+    return candidates;
+  }
+
   // Uniform: N identical rounds
   for (const c1 of [0, 1, 2]) {
-    if (c1 > cp) continue;
-    if ((M - 2 * c1) % 4 === 0 && (W - 2 * c1) % 4 === 0) {
-      const a = (M - 2 * c1) / 4, b = (W - 2 * c1) / 4;
-      if (a >= 0 && b >= 0 && a + b + c1 === cp) {
+    if (c1 > remCp) continue;
+    if ((M_base - 2 * c1) % 4 === 0 && (W_base - 2 * c1) % 4 === 0) {
+      const a = (M_base - 2 * c1) / 4, b = (W_base - 2 * c1) / 4;
+      if (a >= 0 && b >= 0 && a + b + c1 === remCp) {
         candidates.push({
-          dist: Array.from({length: N}, () => [a, b, c1]),
-          a: a * N, b: b * N, c: c1 * N, uniform: true
+          dist: Array.from({length: N}, () => [a, b, c1, special]),
+          a: a * N, b: b * N, c: c1 * N, uniform: true, special: !!special
         });
       }
     }
   }
+
   // Mixed: two different round types
   const combos = [];
-  for (let ci = 0; ci <= cp; ci++)
-    for (let cj = 0; cj <= cp; cj++)
+  for (let ci = 0; ci <= remCp; ci++)
+    for (let cj = 0; cj <= remCp; cj++)
       if (ci !== cj) combos.push([ci, cj]);
   for (const [c1, c2] of combos) {
-    if (c1 > cp || c2 > cp) continue;
-    const a1 = (M - 2 * c1) / 4, b1 = (W - 2 * c1) / 4;
-    const a2 = (M - 2 * c2) / 4, b2 = (W - 2 * c2) / 4;
+    if (c1 > remCp || c2 > remCp) continue;
+    if ((M_base - 2 * c1) % 4 !== 0 || (W_base - 2 * c1) % 4 !== 0) continue;
+    if ((M_base - 2 * c2) % 4 !== 0 || (W_base - 2 * c2) % 4 !== 0) continue;
+    const a1 = (M_base - 2 * c1) / 4, b1 = (W_base - 2 * c1) / 4;
+    const a2 = (M_base - 2 * c2) / 4, b2 = (W_base - 2 * c2) / 4;
     if (a1 < 0 || b1 < 0 || a2 < 0 || b2 < 0) continue;
     if (a1 % 1 !== 0 || b1 % 1 !== 0 || a2 % 1 !== 0 || b2 % 1 !== 0) continue;
-    if (a1 + b1 + c1 !== cp || a2 + b2 + c2 !== cp) continue;
+    if (a1 + b1 + c1 !== remCp || a2 + b2 + c2 !== remCp) continue;
     for (let n1 = 1; n1 < N; n1++) {
       const n2 = N - n1;
       const sc = n1 * c1 + n2 * c2;
-      const sa = (N * M - 2 * sc) / 4, sb = (N * W - 2 * sc) / 4;
+      const sa = (N * M_base - 2 * sc) / 4, sb = (N * W_base - 2 * sc) / 4;
       if (n1 * a1 + n2 * a2 === sa && n1 * b1 + n2 * b2 === sb) {
         const d = [];
-        for (let i = 0; i < n1; i++) d.push([a1, b1, c1]);
-        for (let i = 0; i < n2; i++) d.push([a2, b2, c2]);
+        for (let i = 0; i < n1; i++) d.push([a1, b1, c1, special]);
+        for (let i = 0; i < n2; i++) d.push([a2, b2, c2, special]);
         candidates.push({
           dist: d,
           a: a1 * n1 + a2 * n2,
           b: b1 * n1 + b2 * n2,
           c: c1 * n1 + c2 * n2,
-          uniform: false
+          uniform: false,
+          special: !!special
         });
       }
     }
@@ -983,13 +1015,43 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
 
 function checkPairs(matches) {
   const dbUsed = new Set(), wbUsed = new Set(), mxUsed = new Set();
+  const xwMxCount = {}, xwWbCount = {}, xdMxCount = {}, xdDbCount = {};
+  const MAX_SPECIAL_REPEAT = 2;
   for (const m of matches) {
     const [r, type, t1, t2] = m;
-    const s = type === 'DB' ? dbUsed : type === 'WB' ? wbUsed : mxUsed;
-    const k1 = type === 'MX' ? t1[0]+','+t1[1] : Math.min(...t1)+','+Math.max(...t1);
-    const k2 = type === 'MX' ? t2[0]+','+t2[1] : Math.min(...t2)+','+Math.max(...t2);
-    if (s.has(k1) || s.has(k2)) return false;
-    s.add(k1); s.add(k2);
+    if (type === 'DB') {
+      const k1 = Math.min(...t1)+','+Math.max(...t1);
+      const k2 = Math.min(...t2)+','+Math.max(...t2);
+      if (dbUsed.has(k1) || dbUsed.has(k2)) return false;
+      dbUsed.add(k1); dbUsed.add(k2);
+    } else if (type === 'WB') {
+      const k1 = Math.min(...t1)+','+Math.max(...t1);
+      const k2 = Math.min(...t2)+','+Math.max(...t2);
+      if (wbUsed.has(k1) || wbUsed.has(k2)) return false;
+      wbUsed.add(k1); wbUsed.add(k2);
+    } else if (type === 'MX') {
+      const k1 = t1[0]+','+t1[1];
+      const k2 = t2[0]+','+t2[1];
+      if (mxUsed.has(k1) || mxUsed.has(k2)) return false;
+      mxUsed.add(k1); mxUsed.add(k2);
+    } else if (type === 'XW') {
+      xwMxCount[t1[0]+','+t1[1]] = (xwMxCount[t1[0]+','+t1[1]] || 0) + 1;
+      if (xwMxCount[t1[0]+','+t1[1]] > MAX_SPECIAL_REPEAT) return false;
+      const wbKey = Math.min(...t2)+','+Math.max(...t2);
+      xwWbCount[wbKey] = (xwWbCount[wbKey] || 0) + 1;
+      if (xwWbCount[wbKey] > MAX_SPECIAL_REPEAT) return false;
+    } else if (type === 'XD') {
+      xdMxCount[t1[0]+','+t1[1]] = (xdMxCount[t1[0]+','+t1[1]] || 0) + 1;
+      if (xdMxCount[t1[0]+','+t1[1]] > MAX_SPECIAL_REPEAT) return false;
+      const dbKey = Math.min(...t2)+','+Math.max(...t2);
+      xdDbCount[dbKey] = (xdDbCount[dbKey] || 0) + 1;
+      if (xdDbCount[dbKey] > MAX_SPECIAL_REPEAT) return false;
+    } else if (type === 'MB') {
+      const k1 = Math.min(...t1)+','+Math.max(...t1);
+      const k2 = Math.min(...t2)+','+Math.max(...t2);
+      if (dbUsed.has(k1) || wbUsed.has(k2)) return false;
+      dbUsed.add(k1); wbUsed.add(k2);
+    }
   }
   return true;
 }
@@ -1009,11 +1071,6 @@ function countPairOccurrences(matches, type, p1, p2) {
 }
 
 function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels) {
-  // pairCons: [{p1,p2,rel}] for DB/WB
-  // mixedCons: [{m,w,rel}] for MX  (rel: 'team'|'opponent')
-  // fixedCons: [{a,b,c,d}] 4-player fixed match
-  // relax: how many extra repeats allowed (0=strict, 1=allow 1 repeat, 2=allow 2)
-
   relax = relax || 0;
   const sa = dist.reduce((s, d) => s + d[0], 0);
   const sb = dist.reduce((s, d) => s + d[1], 0);
@@ -1026,40 +1083,177 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
 
   const dbLeft = [...dbTgt], wbLeft = [...wbTgt];
   const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
+  const usedSMX = new Set(), usedSWB = new Set(), usedSDB = new Set();
   const maxCountDB = new Map(), maxCountWB = new Map(), maxCountMX = new Map();
   const rrDB = rrPairs(M), rrWB = rrPairs(W);
   const matches = [];
 
-  // Track which constraints have been satisfied already (to avoid re-forcing)
-  const satPair = new Set(); // key: 'p1,p2'
-  const satMixed = new Set(); // key: 'm,w'
-  const satFixed = new Set(); // index
-
-  // For fixed matches, try to allocate them
+  const satPair = new Set();
+  const satMixed = new Set();
+  const satFixed = new Set();
   const fixedRemaining = fixedCons ? [...fixedCons] : [];
 
+  // Helper: pick special court MXxWB (1M+3W) with NTRP level awareness
+  function pickXW(rnd) {
+    const menOrder = [...Array(M).keys()], womenOrder = [...Array(W).keys()];
+    function xwScore(mIdx, wMx, wb0, wb1) {
+      const t1 = (maleLevels[mIdx]||3.0) + (femaleLevels[wMx]||3.0);
+      const t2 = (femaleLevels[wb0]||3.0) + (femaleLevels[wb1]||3.0);
+      return Math.abs(t1 - t2);
+    }
+    let best = null, bestScore = Infinity, bestRepeat = null, bestRepeatScore = Infinity;
+    const startM = rnd % M, startW_base = rnd % W;
+    for (let mi = 0; mi < M; mi++) {
+      const mIdx = menOrder[(startM + mi) % M];
+      const startW = (startW_base + mi) % W;
+      for (let wi = 0; wi < W; wi++) {
+        const wMx = womenOrder[(startW + wi) % W];
+        const mxKey = mIdx + ',' + wMx;
+        const restW = womenOrder.filter(w => w !== wMx);
+        for (let wbi = 0; wbi < restW.length - 1; wbi++)
+          for (let wbj = wbi + 1; wbj < restW.length; wbj++) {
+            const wbKey = Math.min(restW[wbi], restW[wbj]) + ',' + Math.max(restW[wbi], restW[wbj]);
+            const sc = xwScore(mIdx, wMx, restW[wbi], restW[wbj]);
+            if (!usedSMX.has(mxKey) && !usedSWB.has(wbKey)) {
+              if (sc < bestScore) { bestScore = sc; best = [mIdx, wMx, restW[wbi], restW[wbj], sc]; }
+            } else {
+              if (sc < bestRepeatScore) { bestRepeatScore = sc; bestRepeat = [mIdx, wMx, restW[wbi], restW[wbj], sc]; }
+            }
+          }
+      }
+    }
+    return (best || bestRepeat || null);
+  }
+
+  // Helper: pick special court MXxDB (3M+1W) with NTRP level awareness
+  function pickXD(rnd) {
+    const menOrder = [...Array(M).keys()], womenOrder = [...Array(W).keys()];
+    function xdScore(mMx, wIdx, db0, db1) {
+      const t1 = (maleLevels[mMx]||3.0) + (femaleLevels[wIdx]||3.0);
+      const t2 = (maleLevels[db0]||3.0) + (maleLevels[db1]||3.0);
+      return Math.abs(t1 - t2);
+    }
+    let best = null, bestScore = Infinity, bestRepeat = null, bestRepeatScore = Infinity;
+    const startW = rnd % W, startM_base = rnd % M;
+    for (let wi = 0; wi < W; wi++) {
+      const wIdx = womenOrder[(startW + wi) % W];
+      const startM = (startM_base + wi) % M;
+      for (let mi = 0; mi < M; mi++) {
+        const mMx = menOrder[(startM + mi) % M];
+        const mxKey = mMx + ',' + wIdx;
+        const restM = menOrder.filter(m => m !== mMx);
+        for (let dbi = 0; dbi < restM.length - 1; dbi++)
+          for (let dbj = dbi + 1; dbj < restM.length; dbj++) {
+            const dbKey = Math.min(restM[dbi], restM[dbj]) + ',' + Math.max(restM[dbi], restM[dbj]);
+            const sc = xdScore(mMx, wIdx, restM[dbi], restM[dbj]);
+            if (!usedSMX.has(mxKey) && !usedSDB.has(dbKey)) {
+              if (sc < bestScore) { bestScore = sc; best = [mMx, wIdx, restM[dbi], restM[dbj], sc]; }
+            } else {
+              if (sc < bestRepeatScore) { bestRepeatScore = sc; bestRepeat = [mMx, wIdx, restM[dbi], restM[dbj], sc]; }
+            }
+          }
+      }
+    }
+    return (best || bestRepeat || null);
+  }
+
   for (let r = 0; r < N; r++) {
-    let [a, b, c] = dist[r];
+    let [a, b, c, special] = dist[r];
     let needDB = 4 * a, needWB = 4 * b, needMX = 2 * c;
 
-    // --- DB ---
+    // --- Special court ---
+    const specM = [], specW = [];
+    if (special === 'XW') {
+      // Check fixed constraints first
+      let fromFixed = null;
+      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+        const fc = fixedRemaining[fi];
+        const pat = fc.genders;
+        if (pat === 'MWWW' || pat === 'WMWW' || pat === 'WWMW') {
+          // Find which player is the man
+          let mxM, mxW, wb0, wb1;
+          if (pat[0] === 'M') { mxM = fc.a; mxW = fc.b; wb0 = fc.c; wb1 = fc.d; }
+          else if (pat[1] === 'M') { mxM = fc.b; mxW = fc.a; wb0 = fc.c; wb1 = fc.d; }
+          else if (pat[2] === 'M') { mxM = fc.c; mxW = fc.d; wb0 = fc.a; wb1 = fc.b; }
+          else { mxM = fc.d; mxW = fc.c; wb0 = fc.a; wb1 = fc.b; }
+          fromFixed = { mxM, mxW, wb0, wb1 };
+          fixedRemaining.splice(fi, 1);
+          break;
+        }
+      }
+
+      if (fromFixed) {
+        const { mxM, mxW, wb0, wb1 } = fromFixed;
+        specM.push(mxM); specW.push(mxW, wb0, wb1);
+        usedSMX.add(mxM + ',' + mxW);
+        usedSWB.add(Math.min(wb0, wb1) + ',' + Math.max(wb0, wb1));
+        const lv1 = (maleLevels[mxM]||3.0) + (femaleLevels[mxW]||3.0);
+        const lv2 = (femaleLevels[wb0]||3.0) + (femaleLevels[wb1]||3.0);
+        matches.push([r + 1, 'XW', [mxM, mxW], [wb0, wb1], true, Math.abs(lv1-lv2) > 0.5]);
+      } else {
+        const p = pickXW(r);
+        if (!p) return null;
+        const [sm, swMx, swb0, swb1, lvlDiff] = p;
+        specM.push(sm); specW.push(swMx, swb0, swb1);
+        usedSMX.add(sm + ',' + swMx);
+        usedSWB.add(Math.min(swb0, swb1) + ',' + Math.max(swb0, swb1));
+        matches.push([r + 1, 'XW', [sm, swMx], [swb0, swb1], false, lvlDiff > 0.5]);
+      }
+    } else if (special === 'XD') {
+      // Check fixed constraints first
+      let fromFixed = null;
+      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+        const fc = fixedRemaining[fi];
+        const pat = fc.genders;
+        if (pat === 'MMMW' || pat === 'MWMM' || pat === 'MMWM') {
+          // Find which player is the woman
+          let mMx, w, db0, db1;
+          if (pat[0] === 'W') { w = fc.a; mMx = fc.b; db0 = fc.c; db1 = fc.d; }
+          else if (pat[1] === 'W') { w = fc.b; mMx = fc.a; db0 = fc.c; db1 = fc.d; }
+          else if (pat[2] === 'W') { w = fc.c; mMx = fc.d; db0 = fc.a; db1 = fc.b; }
+          else { w = fc.d; mMx = fc.c; db0 = fc.a; db1 = fc.b; }
+          fromFixed = { mMx, w, db0, db1 };
+          fixedRemaining.splice(fi, 1);
+          break;
+        }
+      }
+
+      if (fromFixed) {
+        const { mMx, w, db0, db1 } = fromFixed;
+        specM.push(mMx, db0, db1); specW.push(w);
+        usedSMX.add(mMx + ',' + w);
+        usedSDB.add(Math.min(db0, db1) + ',' + Math.max(db0, db1));
+        const lv1 = (maleLevels[mMx]||3.0) + (femaleLevels[w]||3.0);
+        const lv2 = (maleLevels[db0]||3.0) + (maleLevels[db1]||3.0);
+        matches.push([r + 1, 'XD', [mMx, w], [db0, db1], true, Math.abs(lv1-lv2) > 0.5]);
+      } else {
+        const p = pickXD(r);
+        if (!p) return null;
+        const [smMx, sw, sdb0, sdb1, lvlDiff] = p;
+        specM.push(smMx, sdb0, sdb1); specW.push(sw);
+        usedSMX.add(smMx + ',' + sw);
+        usedSDB.add(Math.min(sdb0, sdb1) + ',' + Math.max(sdb0, sdb1));
+        matches.push([r + 1, 'XD', [smMx, sw], [sdb0, sdb1], false, lvlDiff > 0.5]);
+      }
+    }
+
+    const availM = [...Array(M).keys()].filter(p => !specM.includes(p));
+    const availW = [...Array(W).keys()].filter(p => !specW.includes(p));
+
+    // --- DB (rest of the original DB code, but using availM instead of all M) ---
     let mxM;
     if (needDB > 0) {
-      let cand = [...Array(M).keys()].filter(p => dbLeft[p] > 0)
-        .sort((p1, p2) => dbLeft[p2] - dbLeft[p1]);
-
-      if (cand.length < needDB) { console.log('_go fail: needDB>cand'); return null; }
+      let cand = availM.filter(p => dbLeft[p] > 0).sort((p1, p2) => dbLeft[p2] - dbLeft[p1]);
+      if (cand.length < needDB) return null;
       let chosen = new Set(cand.slice(0, needDB));
-
-      // Ensure constraint pair participants are in chosen (only if not yet satisfied)
+      // Ensure constraint pair participants are in chosen
       const dbPairCons = pairCons.filter(pc => pc.gender === 'M');
       const neededForPair = new Set();
       for (const pc of dbPairCons) {
         const pk = pc.p1 + ',' + pc.p2;
         if (satPair.has(pk)) continue;
         if (cand.includes(pc.p1) && cand.includes(pc.p2)) {
-          neededForPair.add(pc.p1);
-          neededForPair.add(pc.p2);
+          neededForPair.add(pc.p1); neededForPair.add(pc.p2);
         }
       }
       if (neededForPair.size <= needDB && neededForPair.size > 0) {
@@ -1067,113 +1261,103 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           if (!chosen.has(np)) {
             for (const c of cand) {
               if (!neededForPair.has(c) && chosen.has(c)) {
-                chosen.delete(c);
-                chosen.add(np);
-                break;
+                chosen.delete(c); chosen.add(np); break;
               }
             }
           }
         }
       }
 
-      // Build forced teams for DB (only for constraints NOT yet satisfied)
       const forcedTeams = [];
       for (const pc of dbPairCons) {
         const pk = pc.p1 + ',' + pc.p2;
         if (satPair.has(pk)) continue;
-        if (chosen.has(pc.p1) && chosen.has(pc.p2) && pc.rel === 'team') {
+        if (chosen.has(pc.p1) && chosen.has(pc.p2) && pc.rel === 'team')
           forcedTeams.push([pc.p1, pc.p2]);
-        }
       }
 
-      // Check if fixed match fits here (4 males)
+      // Fixed matches for DB
       const fixedThis = [];
       for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
         const fc = fixedRemaining[fi];
-        // All 4 are male?
-        if (fc.genders && fc.genders === 'MMMM' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
-          fixedThis.push(fc);
-          fixedRemaining.splice(fi, 1);
+        if (fc.genders === 'MMMM' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
+          fixedThis.push(fc); fixedRemaining.splice(fi, 1);
         }
       }
 
       for (const p of chosen) dbLeft[p]--;
-
-      if (isUniform && needDB === M && fixedThis.length === 0) {
-        const rrRound = rrDB[r % rrDB.length];
-        const pp = shuffle([...rrRound]);
-        for (let k = 0; k < pp.length; k += 2) {
-          const t1 = pp[k], t2 = pp[k + 1];
-          usedDB.add(Math.min(...t1)+','+Math.max(...t1));
-          usedDB.add(Math.min(...t2)+','+Math.max(...t2));
-          matches.push([r+1, 'DB', t1, t2]);
-        }
-      } else {
-        const usedForCheck = relax > 0 ? new Set() : usedDB;
-        var maxAllow = 2 + relax;
-        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, maleLevels, maxCountDB, maxAllow);
-        if (!pp) { console.log('_go fail: flexPair DB round '+r); return null; }
-
-        // Mark satisfied pair constraints (DB)
-        for (const [t1, t2] of pp) {
+      // Skip round-robin when special court is active
+      if (isUniform && !special && needDB === availM.length && needDB === chosen.size) {
+        const rrIdx = r % rrDB.length;
+        const rrRound = rrDB[rrIdx];
+        const validPairs = rrRound.filter(p => p.every(pi => availM.includes(pi)));
+        if (validPairs.length >= 2) {
+          const pp = shuffle([...validPairs]);
+          for (let k = 0; k < pp.length; k += 2) {
+            const [t1, t2] = [pp[k], pp[k + 1]];
+            usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+            usedDB.add(Math.min(...t2)+','+Math.max(...t2));
+            matches.push([r+1, 'DB', t1, t2, false]);
+          }
+        } else {
+          const pp = flexPair([...chosen], relax > 0 ? new Set() : usedDB, 500, forcedTeams, maleLevels, maxCountDB, 2 + relax);
+          if (!pp) return null;
           for (const pc of dbPairCons) {
             const pk = pc.p1 + ',' + pc.p2;
             if (satPair.has(pk)) continue;
-            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) {
-              satPair.add(pk);
-            } else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) {
-              satPair.add(pk);
+            for (const [t1, t2] of pp) {
+              if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
+              else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
             }
           }
-        }
-
-        const pairList = [];
-        for (const [t1, t2] of pp) {
-          pairList.push(t1, t2);
-        }
-
-        // Apply fixed matches - replace appropriate match
-        let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
-        for (const fc of fixedThis) {
-          let replaced = false;
+          let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+          for (const fc of fixedThis) {
+            for (let pi = 0; pi < ppCopy.length; pi++) {
+              if (!ppCopy[pi]._fixed) { ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]]; ppCopy[pi]._fixed = true; break; }
+            }
+          }
           for (let pi = 0; pi < ppCopy.length; pi++) {
             const [t1, t2] = ppCopy[pi];
-            // Check if we can replace this match with the fixed one
-            if (!replaced) {
-              ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]];
-              replaced = true;
-              // Mark as constrained
-              ppCopy[pi]._fixed = true;
-            }
+            usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+            usedDB.add(Math.min(...t2)+','+Math.max(...t2));
+            matches.push([r+1, 'DB', t1, t2, !!ppCopy[pi]._fixed]);
           }
         }
-
+      } else {
+        const pp = flexPair([...chosen], relax > 0 ? new Set() : usedDB, 500, forcedTeams, maleLevels, maxCountDB, 2 + relax);
+        if (!pp) return null;
+        for (const pc of dbPairCons) {
+          const pk = pc.p1 + ',' + pc.p2;
+          if (satPair.has(pk)) continue;
+          for (const [t1, t2] of pp) {
+            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
+            else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
+          }
+        }
+        let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+        for (const fc of fixedThis) {
+          for (let pi = 0; pi < ppCopy.length; pi++) {
+            if (!ppCopy[pi]._fixed) { ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]]; ppCopy[pi]._fixed = true; break; }
+          }
+        }
         for (let pi = 0; pi < ppCopy.length; pi++) {
           const [t1, t2] = ppCopy[pi];
           if (relax <= 0) {
             usedDB.add(Math.min(...t1)+','+Math.max(...t1));
             usedDB.add(Math.min(...t2)+','+Math.max(...t2));
-          } else {
-            // Check pair counts
-            const k1 = Math.min(...t1)+','+Math.max(...t1);
-            const k2 = Math.min(...t2)+','+Math.max(...t2);
-            // In relaxed mode, we still add to usedDB but the validation is more lenient
-            usedDB.add(k1); usedDB.add(k2);
           }
-          matches.push([r+1, 'DB', t1, t2, ppCopy[pi]._fixed ? true : false]);
+          matches.push([r+1, 'DB', t1, t2, !!ppCopy[pi]._fixed]);
         }
       }
-      mxM = [...Array(M).keys()].filter(p => !chosen.has(p));
+      mxM = availM.filter(p => !chosen.has(p));
     } else {
-      mxM = [...Array(M).keys()];
+      mxM = [...availM];
     }
 
-    // --- WB ---
+    // --- WB (same pattern: use availW) ---
     let mxF;
     if (needWB > 0) {
-      let cand = [...Array(W).keys()].filter(p => wbLeft[p] > 0)
-        .sort((p1, p2) => wbLeft[p2] - wbLeft[p1]);
-      // Shuffle within same wbLeft groups
+      let cand = availW.filter(p => wbLeft[p] > 0).sort((p1, p2) => wbLeft[p2] - wbLeft[p1]);
       for (var ci = 0; ci < cand.length;) {
         var cj = ci;
         while (cj < cand.length && wbLeft[cand[cj]] === wbLeft[cand[ci]]) cj++;
@@ -1183,29 +1367,23 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         }
         ci = cj;
       }
-      if (cand.length < needWB) { console.log('_go fail: needWB>cand'); return null; }
+      if (cand.length < needWB) return null;
       let chosen = new Set(cand.slice(0, needWB));
 
-      // Ensure pair constraint participants are selected (WB)
       const wbPairCons = pairCons.filter(pc => pc.gender === 'W');
       const neededForPair = new Set();
       for (const pc of wbPairCons) {
         const pk = pc.p1 + ',' + pc.p2;
         if (satPair.has(pk)) continue;
         if (cand.includes(pc.p1) && cand.includes(pc.p2)) {
-          neededForPair.add(pc.p1);
-          neededForPair.add(pc.p2);
+          neededForPair.add(pc.p1); neededForPair.add(pc.p2);
         }
       }
       if (neededForPair.size <= needWB && neededForPair.size > 0) {
         for (const np of neededForPair) {
           if (!chosen.has(np)) {
             for (const c of cand) {
-              if (!neededForPair.has(c) && chosen.has(c)) {
-                chosen.delete(c);
-                chosen.add(np);
-                break;
-              }
+              if (!neededForPair.has(c) && chosen.has(c)) { chosen.delete(c); chosen.add(np); break; }
             }
           }
         }
@@ -1215,133 +1393,164 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
       for (const pc of wbPairCons) {
         const pk = pc.p1 + ',' + pc.p2;
         if (satPair.has(pk)) continue;
-        if (chosen.has(pc.p1) && chosen.has(pc.p2) && pc.rel === 'team') {
+        if (chosen.has(pc.p1) && chosen.has(pc.p2) && pc.rel === 'team')
           forcedTeams.push([pc.p1, pc.p2]);
-        }
       }
 
-      // Check for fixed matches (4 females)
       const fixedThis = [];
       for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
         const fc = fixedRemaining[fi];
-        if (fc.genders && fc.genders === 'WWWW' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
-          fixedThis.push(fc);
-          fixedRemaining.splice(fi, 1);
+        if (fc.genders === 'WWWW' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
+          fixedThis.push(fc); fixedRemaining.splice(fi, 1);
         }
       }
 
       for (const p of chosen) wbLeft[p]--;
 
-      if (isUniform && needWB === W && fixedThis.length === 0) {
-        const rrRound = rrWB[r % rrWB.length];
-        const pp = shuffle([...rrRound]);
-        for (let k = 0; k < pp.length; k += 2) {
-          const t1 = pp[k], t2 = pp[k + 1];
-          usedWB.add(Math.min(...t1)+','+Math.max(...t1));
-          usedWB.add(Math.min(...t2)+','+Math.max(...t2));
-          matches.push([r+1, 'WB', t1, t2]);
-        }
-      } else {
-        const usedForCheck = relax > 0 ? new Set() : usedWB;
-        var maxAllow = 2 + relax;
-        const pp = flexPair([...chosen], usedForCheck, 500, forcedTeams, femaleLevels, maxCountWB, maxAllow);
-        if (!pp) { console.log('_go fail: flexPair WB round '+r); return null; }
-
-        // Mark satisfied pair constraints (WB)
-        for (const [t1, t2] of pp) {
+      if (isUniform && !special && needWB === availW.length && needWB === chosen.size) {
+        const rrIdx = r % rrWB.length;
+        const rrRound = rrWB[rrIdx];
+        const validPairs = rrRound.filter(p => p.every(pi => availW.includes(pi)));
+        if (validPairs.length >= 2) {
+          const pp = shuffle([...validPairs]);
+          for (let k = 0; k < pp.length; k += 2) {
+            const [t1, t2] = [pp[k], pp[k + 1]];
+            usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+            usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+            matches.push([r+1, 'WB', t1, t2, false]);
+          }
+        } else {
+          const pp = flexPair([...chosen], relax > 0 ? new Set() : usedWB, 500, forcedTeams, femaleLevels, maxCountWB, 2 + relax);
+          if (!pp) return null;
           for (const pc of wbPairCons) {
             const pk = pc.p1 + ',' + pc.p2;
             if (satPair.has(pk)) continue;
-            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) {
-              satPair.add(pk);
-            } else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) {
-              satPair.add(pk);
+            for (const [t1, t2] of pp) {
+              if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
+              else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
             }
+          }
+          let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+          for (const fc of fixedThis) {
+            for (let pi = 0; pi < ppCopy.length; pi++) {
+              if (!ppCopy[pi]._fixed) { ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]]; ppCopy[pi]._fixed = true; break; }
+            }
+          }
+          for (let pi = 0; pi < ppCopy.length; pi++) {
+            const [t1, t2] = ppCopy[pi];
+            usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+            usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+            matches.push([r+1, 'WB', t1, t2, !!ppCopy[pi]._fixed]);
+          }
+        }
+      } else {
+        const pp = flexPair([...chosen], relax > 0 ? new Set() : usedWB, 500, forcedTeams, femaleLevels, maxCountWB, 2 + relax);
+        if (!pp) return null;
+        for (const pc of wbPairCons) {
+          const pk = pc.p1 + ',' + pc.p2;
+          if (satPair.has(pk)) continue;
+          for (const [t1, t2] of pp) {
+            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
+            else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
+          }
+        }
+        let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
+        for (const fc of fixedThis) {
+          for (let pi = 0; pi < ppCopy.length; pi++) {
+            if (!ppCopy[pi]._fixed) { ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]]; ppCopy[pi]._fixed = true; break; }
+          }
+        }
+        for (let pi = 0; pi < ppCopy.length; pi++) {
+          const [t1, t2] = ppCopy[pi];
+          usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+          usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+          matches.push([r+1, 'WB', t1, t2, !!ppCopy[pi]._fixed]);
+        }
+      }
+      mxF = availW.filter(p => !chosen.has(p));
+    } else {
+      mxF = [...availW];
+    }
+
+    // --- MX ---
+    if (needMX > 0) {
+      // Check fixed MB matches (MMWW: 男男vs女女) FIRST
+      let mbFixed = null;
+      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+        const fc = fixedRemaining[fi];
+        if (fc.genders === 'MMWW' || fc.genders === 'WWMM') {
+          const allPlayers = [fc.a, fc.b, fc.c, fc.d];
+          const men = allPlayers.filter(p => mxM.includes(p));
+          const women = allPlayers.filter(p => mxF.includes(p));
+          if (men.length === 2 && women.length === 2) {
+            mbFixed = fc;
+            fixedRemaining.splice(fi, 1);
+            break;
+          }
+        }
+      }
+
+      if (mbFixed) {
+        const fc = mbFixed;
+        let t1, t2;
+        if (fc.genders === 'MMWW') { t1 = [fc.a, fc.b]; t2 = [fc.c, fc.d]; }
+        else { t1 = [fc.c, fc.d]; t2 = [fc.a, fc.b]; }
+        usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+        usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+        const lv1 = (maleLevels[t1[0]]||3.0)+(maleLevels[t1[1]]||3.0);
+        const lv2 = (femaleLevels[t2[0]]||3.0)+(femaleLevels[t2[1]]||3.0);
+        matches.push([r+1, 'MB', t1, t2, true, Math.abs(lv1-lv2) > 0.5]);
+        // Remove used players from pools
+        for (const p of t1) { var mi = mxM.indexOf(p); if (mi>=0) mxM.splice(mi,1); }
+        for (const p of t2) { var fi = mxF.indexOf(p); if (fi>=0) mxF.splice(fi,1); }
+        needMX -= 2;
+      }
+
+      if (needMX > 0 && mxM.length >= 2 && mxF.length >= 2) {
+        const forcedPairs = [];
+        for (const mc of mixedCons) {
+          const pk = mc.m + ',' + mc.w;
+          if (satMixed.has(pk)) continue;
+          if (mxM.includes(mc.m) && mxF.includes(mc.w) && mc.rel === 'team')
+            forcedPairs.push([mc.m, mc.w]);
+        }
+
+        const fixedThis = [];
+        for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
+          const fc = fixedRemaining[fi];
+          if (fc.genders === 'MXMX' && mxM.includes(fc.a) && mxF.includes(fc.b) && mxM.includes(fc.c) && mxF.includes(fc.d)) {
+            fixedThis.push(fc); fixedRemaining.splice(fi, 1);
+          }
+        }
+
+        const pp = flexMix(mxM, mxF, relax > 0 ? new Set() : usedMX, 500, forcedPairs, maleLevels, femaleLevels, maxCountMX, 2 + relax);
+        if (!pp) return null;
+
+        for (const [t1, t2] of pp) {
+          for (const mc of mixedCons) {
+            const pk = mc.m + ',' + mc.w;
+            if (satMixed.has(pk)) continue;
+            if (mc.rel === 'team' && ((t1[0] === mc.m && t1[1] === mc.w) || (t2[0] === mc.m && t2[1] === mc.w))) satMixed.add(pk);
+            else if (mc.rel === 'opponent' && ((t1[0] === mc.m && t2[1] === mc.w) || (t2[0] === mc.m && t1[1] === mc.w))) satMixed.add(pk);
           }
         }
 
         let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
         for (const fc of fixedThis) {
           for (let pi = 0; pi < ppCopy.length; pi++) {
-            if (!ppCopy[pi]._fixed) {
-              ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]];
-              ppCopy[pi]._fixed = true;
-              break;
-            }
+            if (!ppCopy[pi]._fixed) { ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]]; ppCopy[pi]._fixed = true; break; }
           }
         }
-
         for (let pi = 0; pi < ppCopy.length; pi++) {
           const [t1, t2] = ppCopy[pi];
-          usedWB.add(Math.min(...t1)+','+Math.max(...t1));
-          usedWB.add(Math.min(...t2)+','+Math.max(...t2));
-          matches.push([r+1, 'WB', t1, t2, ppCopy[pi]._fixed ? true : false]);
+          usedMX.add(t1[0]+','+t1[1]);
+          usedMX.add(t2[0]+','+t2[1]);
+          matches.push([r+1, 'MX', t1, t2, !!ppCopy[pi]._fixed]);
         }
-      }
-      mxF = [...Array(W).keys()].filter(p => !chosen.has(p));
-    } else {
-      mxF = [...Array(W).keys()];
-    }
-
-    // --- MX ---
-    if (needMX > 0) {
-      const forcedPairs = [];
-      for (const mc of mixedCons) {
-        const pk = mc.m + ',' + mc.w;
-        if (satMixed.has(pk)) continue;
-        if (mxM.includes(mc.m) && mxF.includes(mc.w) && mc.rel === 'team') {
-          forcedPairs.push([mc.m, mc.w]);
-        }
-      }
-
-      // Check for fixed MX matches (2M+2F)
-      const fixedThis = [];
-      for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
-        const fc = fixedRemaining[fi];
-        if (fc.genders && fc.genders === 'MXMX' && mxM.includes(fc.a) && mxF.includes(fc.b) && mxM.includes(fc.c) && mxF.includes(fc.d)) {
-          fixedThis.push(fc);
-          fixedRemaining.splice(fi, 1);
-        }
-      }
-
-      const usedForCheck = relax > 0 ? new Set() : usedMX;
-      var maxAllow = 2 + relax;
-      const pp = flexMix(mxM, mxF, usedForCheck, 500, forcedPairs, maleLevels, femaleLevels, maxCountMX, maxAllow);
-      if (!pp) { console.log('_go fail: flexMix MX round '+r); return null; }
-
-      // Mark satisfied mixed constraints
-      for (const [t1, t2] of pp) {
-        for (const mc of mixedCons) {
-          const pk = mc.m + ',' + mc.w;
-          if (satMixed.has(pk)) continue;
-          if (mc.rel === 'team' && ((t1[0] === mc.m && t1[1] === mc.w) || (t2[0] === mc.m && t2[1] === mc.w))) {
-            satMixed.add(pk);
-          } else if (mc.rel === 'opponent' && ((t1[0] === mc.m && t2[1] === mc.w) || (t2[0] === mc.m && t1[1] === mc.w))) {
-            satMixed.add(pk);
-          }
-        }
-      }
-
-      let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
-      for (const fc of fixedThis) {
-        for (let pi = 0; pi < ppCopy.length; pi++) {
-          if (!ppCopy[pi]._fixed) {
-            ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]];
-            ppCopy[pi]._fixed = true;
-            break;
-          }
-        }
-      }
-
-      for (let pi = 0; pi < ppCopy.length; pi++) {
-        const [t1, t2] = ppCopy[pi];
-        usedMX.add(t1[0]+','+t1[1]);
-        usedMX.add(t2[0]+','+t2[1]);
-        matches.push([r+1, 'MX', t1, t2, ppCopy[pi]._fixed ? true : false]);
       }
     }
 
-    // Update maxCount for partner + opponent relationships in this round
+    // Update maxCount for partner + opponent relationships
     for (var mi = matches.length - matches.filter(function(x){return x[0]===r+1;}).length; mi < matches.length; mi++) {
       var rm = matches[mi];
       var rt = rm[1], r1 = rm[2], r2 = rm[3];
@@ -1363,55 +1572,35 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           var ok = Math.min(r1[ai],r2[bi])+','+Math.max(r1[ai],r2[bi]);
           maxCountWB.set(ok, (maxCountWB.get(ok)||0)+1);
         }
-      } else {
-        var ck1 = r1[0]+','+r1[1];
-        var ck2 = r2[0]+','+r2[1];
+      } else if (rt === 'MX') {
+        var ck1 = r1[0]+','+r1[1]; var ck2 = r2[0]+','+r2[1];
         maxCountMX.set(ck1, (maxCountMX.get(ck1)||0)+1);
         maxCountMX.set(ck2, (maxCountMX.get(ck2)||0)+1);
-        // MX opponents: male vs male, female vs female across teams
         var okM = Math.min(r1[0],r2[0])+','+Math.max(r1[0],r2[0]);
         var okW = Math.min(r1[1],r2[1])+','+Math.max(r1[1],r2[1]);
         maxCountMX.set(okM, (maxCountMX.get(okM)||0)+1);
         maxCountMX.set(okW, (maxCountMX.get(okW)||0)+1);
       }
+      // Note: XW/XD don't use maxCount tracking for now (small player pools)
     }
   }
 
-  // Verify match counts (each player plays 5)
+  // Verify match counts
   const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') { for (const p of [...t1, ...t2]) mc[p]++; }
     else if (type === 'WB') { for (const p of [...t1, ...t2]) fc[p]++; }
-    else { mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++; }
+    else if (type === 'MX') { mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++; }
+    else if (type === 'XW') { mc[t1[0]]++; fc[t1[1]]++; fc[t2[0]]++; fc[t2[1]]++; }
+    else if (type === 'XD') { mc[t1[0]]++; mc[t2[0]]++; mc[t2[1]]++; fc[t1[1]]++; }
+    else if (type === 'MB') { for (const p of [...t1]) mc[p]++; for (const p of [...t2]) fc[p]++; }
   }
-  if (!mc.every(v => v === N) || !fc.every(v => v === N)) { console.log('_go fail: verify counts'); return null; }
+  if (!mc.every(v => v === N) || !fc.every(v => v === N)) return null;
 
-  // Verify pairs (with relaxation)
-  if (relax <= 0) {
-    if (!checkPairs(matches)) { console.log('_go fail: checkPairs'); return null; }
-  } else {
-    // Relaxed check: allow repeated pairs up to (1 + relax) times
-    const dbCount = {}, wbCount = {}, mxCount = {};
-    for (const m of matches) {
-      const [r, type, t1, t2] = m;
-      const cnt = type === 'DB' ? dbCount : type === 'WB' ? wbCount : mxCount;
-      const k1 = type === 'MX' ? t1[0]+','+t1[1] : Math.min(...t1)+','+Math.max(...t1);
-      const k2 = type === 'MX' ? t2[0]+','+t2[1] : Math.min(...t2)+','+Math.max(...t2);
-      cnt[k1] = (cnt[k1] || 0) + 1;
-      cnt[k2] = (cnt[k2] || 0) + 1;
-    }
-    const maxAllow = 1 + relax;
-    for (const cnt of [dbCount, wbCount, mxCount]) {
-      for (const v of Object.values(cnt)) {
-        if (v > maxAllow) { console.log('_go fail: relaxed check'); return null; }
-      }
-    }
-  }
-
+  if (!checkPairs(matches)) return null;
   return matches;
 }
-
 function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
   tries = tries || 3000;
   relax = relax || 0;
@@ -1535,7 +1724,11 @@ function verifyConstraints(matches, M, W, constraints, relax) {
       for (const m of matches) {
         const [r, type, t1, t2] = m;
         const typeMatch = (c.genders === 'MMMM') ? type === 'DB' :
-                          (c.genders === 'WWWW') ? type === 'WB' : type === 'MX';
+                          (c.genders === 'WWWW') ? type === 'WB' :
+                          (c.genders === 'MMWW' || c.genders === 'WWMM') ? type === 'MB' :
+                          (c.genders === 'MWWW' || c.genders === 'WMWW' || c.genders === 'WWMW') ? type === 'XW' :
+                          (c.genders === 'MMMW' || c.genders === 'MWMM' || c.genders === 'MMWM') ? type === 'XD' :
+                          type === 'MX';
 
         if (!typeMatch) continue;
 
@@ -1544,17 +1737,10 @@ function verifyConstraints(matches, M, W, constraints, relax) {
           return players.every(p => team.includes(p));
         }
 
-        if (type === 'MX') {
-          if ((t1[0] === a && t1[1] === b && t2[0] === cc && t2[1] === d) ||
-              (t1[0] === cc && t1[1] === d && t2[0] === a && t2[1] === b)) {
-            found = true; break;
-          }
-        } else {
-          const team1 = [a, b], team2 = [cc, d];
-          if ((hasAll(t1, team1) && hasAll(t2, team2)) ||
-              (hasAll(t1, team2) && hasAll(t2, team1))) {
-            found = true; break;
-          }
+        const team1 = [a, b], team2 = [cc, d];
+        if ((hasAll(t1, team1) && hasAll(t2, team2)) ||
+            (hasAll(t1, team2) && hasAll(t2, team1))) {
+          found = true; break;
         }
       }
       if (!found) return false;
@@ -1565,8 +1751,8 @@ function verifyConstraints(matches, M, W, constraints, relax) {
 
 // ==================== Rendering ====================
 
-const TYPE_LABELS = { DB: '男双', WB: '女双', MX: '混双' };
-const TYPE_CLASS = { DB: 'db', WB: 'wb', MX: 'mx' };
+const TYPE_LABELS = { DB: '男双', WB: '女双', MX: '混双', XW: 'MX×WB', XD: 'MX×DB', MB: '男双vs女双' };
+const TYPE_CLASS = { DB: 'db', WB: 'wb', MX: 'mx', XW: 'xw', XD: 'xd', MB: 'mb' };
 
 let players = [];
 let currentRound = 0;
@@ -1829,20 +2015,24 @@ document.getElementById('add-fixed-con').addEventListener('click', () => {
   const ga = getGenderIdx(a), gb = getGenderIdx(b), gc = getGenderIdx(c), gd = getGenderIdx(d);
   const genders = [ga.g, gb.g, gc.g, gd.g].join('');
 
-  // Validate: must be all same gender or 2M+2F (MX pattern)
   const mCount = genders.split('').filter(g => g === 'M').length;
-  const wCount = 4 - mCount;
-  if (mCount !== 0 && mCount !== 4 && mCount !== 2) {
-    showError('四人指定仅支持:全男/全女/两男两女(混双)');
+  const team1 = [ga.g, gb.g];
+  const team2 = [gc.g, gd.g];
+  const t1m = team1.filter(g => g === 'M').length;
+  const t2m = team2.filter(g => g === 'M').length;
+
+  const valid = (
+    (mCount === 4 && t1m === 2 && t2m === 2) ||        // MMMM: DB
+    (mCount === 0 && t1m === 0 && t2m === 0) ||         // WWWW: WB
+    (mCount === 2 && t1m === 1 && t2m === 1) ||         // MWMW: MX
+    (mCount === 2 && ((t1m === 2 && t2m === 0) || (t1m === 0 && t2m === 2))) || // MMWW: MB
+    (mCount === 3 && ((t1m === 2 && t2m === 1) || (t1m === 1 && t2m === 2))) || // MMMW: XD
+    (mCount === 1 && ((t1m === 1 && t2m === 0) || (t1m === 0 && t2m === 1)))    // MWWW: XW
+  );
+
+  if (!valid) {
+    showError('无效组合：每组必须为(男+男)/(女+女)/(男+女)');
     return;
-  }
-  if (mCount === 2) {
-    // Check MX pattern: each team should have 1M + 1F
-    // Team1 = A+B, Team2 = C+D
-    if (ga.g === gb.g || gc.g === gd.g) {
-      showError('混双组队每队需一男一女(如 A男+B女 vs C男+D女)');
-      return;
-    }
   }
 
   fixedConstraints.push({
@@ -1910,17 +2100,15 @@ function markConstrainedMatches(result, constraints) {
       for (const m of result) {
         const [r, type, t1, t2] = m;
         const typeMatch = (c.genders === 'MMMM') ? type === 'DB' :
-                          (c.genders === 'WWWW') ? type === 'WB' : type === 'MX';
+                          (c.genders === 'WWWW') ? type === 'WB' :
+                          (c.genders === 'MMWW' || c.genders === 'WWMM') ? type === 'MB' :
+                          (c.genders === 'MWWW' || c.genders === 'WMWW' || c.genders === 'WWMW') ? type === 'XW' :
+                          (c.genders === 'MMMW' || c.genders === 'MWMM' || c.genders === 'MMWM') ? type === 'XD' :
+                          type === 'MX';
         if (!typeMatch) continue;
-        if (type === 'MX') {
-          if ((t1[0] === a && t1[1] === b && t2[0] === cc && t2[1] === d) ||
-              (t1[0] === cc && t1[1] === d && t2[0] === a && t2[1] === b))
-            m[4] = true;
-        } else {
-          if ((t1.includes(a) && t1.includes(b) && t2.includes(cc) && t2.includes(d)) ||
-              (t1.includes(cc) && t1.includes(d) && t2.includes(a) && t2.includes(b)))
-            m[4] = true;
-        }
+        if ((t1.includes(a) && t1.includes(b) && t2.includes(cc) && t2.includes(d)) ||
+            (t1.includes(cc) && t1.includes(d) && t2.includes(a) && t2.includes(b)))
+          m[4] = true;
       }
     }
   }
@@ -1942,7 +2130,10 @@ document.getElementById('gen-btn').addEventListener('click', () => {
 
   if (players.length === 0) { showError('请先添加选手!'); return; }
   for (const p of players) { if (!p.name.trim()) { showError('请为所有选手填写姓名!'); return; } }
-  if (M % 2 !== 0 || W % 2 !== 0) { showError('男女人数必须都是偶数(当前男' + M + '人,女' + W + '人)'); return; }
+  // Odd-odd is now supported with special courts (MXxWB/MXxDB)
+  if ((M % 2 === 1 && W % 2 === 0) || (M % 2 === 0 && W % 2 === 1)) {
+    showError('男女人数必须同为偶数或同为奇数(当前男' + M + '人,女' + W + '人)'); return;
+  }
   if ((M + W) % 4 !== 0) { showError('总人数必须是4的倍数(当前共' + (M+W) + '人)'); return; }
 
   maleNames = mn.map(p => p.name.trim());
@@ -2008,7 +2199,6 @@ document.getElementById('gen-btn').addEventListener('click', () => {
 function buildGenState(M, W, matches, rounds) {
   const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
   const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
-
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') {
@@ -2019,16 +2209,27 @@ function buildGenState(M, W, matches, rounds) {
       for (const p of [...t1, ...t2]) fc[p]++;
       usedWB.add(Math.min(...t1)+','+Math.max(...t1));
       usedWB.add(Math.min(...t2)+','+Math.max(...t2));
-    } else {
+    } else if (type === 'MX') {
       mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++;
       usedMX.add(t1[0]+','+t1[1]);
       usedMX.add(t2[0]+','+t2[1]);
+    } else if (type === 'XW') {
+      mc[t1[0]]++; fc[t1[1]]++; fc[t2[0]]++; fc[t2[1]]++;
+      usedMX.add(t1[0]+','+t1[1]);  // Mixed pair
+      usedWB.add(Math.min(...t2)+','+Math.max(...t2));  // WB pair
+    } else if (type === 'XD') {
+      mc[t1[0]]++; mc[t2[0]]++; mc[t2[1]]++; fc[t1[1]]++;
+      usedMX.add(t1[0]+','+t1[1]);  // Mixed pair
+      usedDB.add(Math.min(...t2)+','+Math.max(...t2));  // DB pair
+    } else if (type === 'MB') {
+      for (const p of [...t1]) mc[p]++;
+      for (const p of [...t2]) fc[p]++;
+      usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+      usedWB.add(Math.min(...t2)+','+Math.max(...t2));
     }
   }
   return { M, W, matches: [...matches], usedDB, usedWB, usedMX, mc, fc, rounds };
-}
-
-let currentRoundCount = 5;
+}let currentRoundCount = 5;
 let MAX_ROUNDS = 10;
 
 function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, suggestion) {
@@ -2053,7 +2254,8 @@ function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, s
   for (const m of matches) {
     if (m[1] === 'DB') dbCount++;
     else if (m[1] === 'WB') wbCount++;
-    else mxCount++;
+    else if (m[1] === 'MX') mxCount++;
+    else if (m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxCount++;
   }
   let conText = '';
   if (constraints && constraints.length > 0) {
@@ -2151,7 +2353,7 @@ function renderAllRounds(matches, N) {
       const tbody = document.createElement('tbody');
 
       matchesInRound.forEach((m, i) => {
-        const [round, type, t1, t2, constrained] = m;
+        const [round, type, t1, t2, constrained, lvlWarn] = m;
         let team1Str, team2Str;
         let lv1 = 0, lv2 = 0;
         if (type === 'DB') {
@@ -2163,6 +2365,21 @@ function renderAllRounds(matches, N) {
           team1Str = nameOf('W', t1[0]) + '(' + levelOf('W', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
           team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
           lv1 = levelOf('W', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+        } else if (type === 'XW') {
+          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
+          team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
+          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+        } else if (type === 'XD') {
+          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
+          team2Str = nameOf('M', t2[0]) + '(' + levelOf('M', t2[0]) + ')' + ' + ' + nameOf('M', t2[1]) + '(' + levelOf('M', t2[1]) + ')';
+          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
+        } else if (type === 'MB') {
+          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('M', t1[1]) + '(' + levelOf('M', t1[1]) + ')';
+          team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
+          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
           lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
         } else {
           team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
@@ -2177,6 +2394,7 @@ function renderAllRounds(matches, N) {
         const diffText = diffIcon + lv1.toFixed(1) + ' vs ' + lv2.toFixed(1);
         const tr = document.createElement('tr');
         if (constrained) tr.style.backgroundColor = '#fff8e1';
+        if (lvlWarn) { tr.style.backgroundColor = '#fff3e0'; tr.title = 'Warning: NTRP diff >0.5, please verify player assignment'; }
         tr.innerHTML = '<td>' + (i + 1) + ' 号场' + (constrained ? ' 📌' : '') + '</td>' +
           '<td><span class="type-tag ' + TYPE_CLASS[type] + '">' + TYPE_LABELS[type] + '</span></td>' +
           '<td><strong>' + team1Str + '</strong> vs <strong>' + team2Str + '</strong><br><small style="color:var(--gray);font-size:11px;">' + diffText + '</small></td>';
@@ -2213,7 +2431,7 @@ function swapRounds(fromIdx, toIdx, matches, N) {
   for (const m of matches) {
     if (m[1] === 'DB') dbC++;
     else if (m[1] === 'WB') wbC++;
-    else mxC++;
+    else if (m[1] === 'MX' || m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxC++;
   }
   const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
   document.getElementById('summary-line').innerHTML =
@@ -2244,7 +2462,7 @@ function deleteRound(r, matches, N) {
   for (const m of newMatches) {
     if (m[1] === 'DB') dbC++;
     else if (m[1] === 'WB') wbC++;
-    else mxC++;
+    else if (m[1] === 'MX' || m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxC++;
   }
   const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
   document.getElementById('summary-line').innerHTML =
@@ -2282,12 +2500,26 @@ function renderPartnerStats(matches, M, W) {
       inc(wp[t1[0]].dbP, 'W' + t1[1]); inc(wp[t1[1]].dbP, 'W' + t1[0]);
       inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
       for (const a of t1) for (const b of t2) { inc(wp[a].dbO, 'W' + b); inc(wp[b].dbO, 'W' + a); }
-    } else {
+    } else if (type === 'MX') {
       inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
       inc(mp[t2[0]].mxP, 'W' + t2[1]); inc(wp[t2[1]].mxP, 'M' + t2[0]);
       // MX opponents: team1 vs team2
       inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(wp[t2[1]].mxO, 'M' + t1[0]);
       inc(mp[t2[0]].mxO, 'W' + t1[1]); inc(wp[t1[1]].mxO, 'M' + t2[0]);
+    } else if (type === 'XW') {
+      inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
+      inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
+      inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(wp[t2[1]].mxO, 'M' + t1[0]);
+      inc(wp[t1[1]].mxO, 'W' + t2[0]); inc(wp[t2[0]].mxO, 'W' + t1[1]);
+    } else if (type === 'XD') {
+      inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
+      inc(mp[t2[0]].dbP, 'M' + t2[1]); inc(mp[t2[1]].dbP, 'M' + t2[0]);
+      inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(mp[t2[1]].mxO, 'W' + t1[0]);
+      inc(wp[t1[1]].mxO, 'M' + t2[0]); inc(mp[t2[0]].mxO, 'W' + t1[1]);
+    } else if (type === 'MB') {
+      inc(mp[t1[0]].dbP, 'M' + t1[1]); inc(mp[t1[1]].dbP, 'M' + t1[0]);
+      inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
+      for (const a of t1) for (const b of t2) { inc(mp[a].dbO, 'W' + b); inc(wp[b].dbO, 'M' + a); }
     }
   }
 
@@ -2331,6 +2563,8 @@ function renderCoverage(matches, M, W) {
       for (const a of t1) for (const b of t2) maleActual.add(Math.min(a,b)+','+Math.max(a,b));
     } else if (type === 'MX') {
       maleActual.add(Math.min(t1[0],t2[0])+','+Math.max(t1[0],t2[0]));
+    } else if (type === 'XD') {
+      maleActual.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
     }
   }
   const mcTotal = maleCombos.length, mcActual = maleActual.size;
@@ -2344,6 +2578,8 @@ function renderCoverage(matches, M, W) {
       for (const a of t1) for (const b of t2) femaleActual.add(Math.min(a,b)+','+Math.max(a,b));
     } else if (type === 'MX') {
       femaleActual.add(Math.min(t1[1],t2[1])+','+Math.max(t1[1],t2[1]));
+    } else if (type === 'XW') {
+      femaleActual.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
     }
   }
   const fcTotal = femaleCombos.length, fcActual = femaleActual.size;
@@ -2593,7 +2829,7 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   });
   
   // Group by round
-  var typeLabel = {DB:'\u7537\u53CC', WB:'\u5973\u53CC', MX:'\u6DF7\u53CC'};
+  var typeLabel = {DB:'\u7537\u53CC', WB:'\u5973\u53CC', MX:'\u6DF7\u53CC', XW:'MX\u00D7WB', XD:'MX\u00D7DB', MB:'\u7537\u53CCvs\u5973\u53CC'};
   var groups = {};
   matches.forEach(function(m) { var rn=m[0]; if(!groups[rn]) groups[rn]=[]; groups[rn].push(m); });
   var rounds = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
@@ -2882,3 +3118,4 @@ if (dateInput && !dateInput.value) {
 </script>
 </body>
 </html>
+

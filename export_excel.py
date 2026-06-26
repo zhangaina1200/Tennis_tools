@@ -75,6 +75,22 @@ def export(matches, output_path, date_str="6月25日", venue_time="19:00-22:00",
             gender = 'M' if mtype == 'DB' else 'W'
             names = male_names if gender == 'M' else female_names
             return names[idx] if names and idx < len(names) else f"{gender}{idx+1}"
+        elif mtype == 'XW':
+            # MX side: (man, woman_mx), WB side: (woman0, woman1)
+            if team_idx == 0:
+                idx = team[player_idx]
+                return male_names[idx] if male_names and idx < len(male_names) else f"M{idx+1}"
+            else:
+                idx = team[player_idx]
+                return female_names[idx] if female_names and idx < len(female_names) else f"W{idx+1}"
+        elif mtype == 'XD':
+            # MX side: (man_mx, woman), DB side: (man0, man1)
+            if team_idx == 0:
+                idx = team[player_idx]
+                return male_names[idx] if male_names and idx < len(male_names) else f"M{idx+1}"
+            else:
+                idx = team[player_idx]
+                return male_names[idx] if male_names and idx < len(male_names) else f"M{idx+1}"
         else:  # MX
             if team_idx == 0:
                 idx = team[player_idx]
@@ -144,7 +160,7 @@ def export(matches, output_path, date_str="6月25日", venue_time="19:00-22:00",
         ws.column_dimensions[get_column_letter(c)].width = w
     
     # ---- Data rows (start from row 3) ----
-    type_label = {'DB': '男双', 'WB': '女双', 'MX': '混双'}
+    type_label = {'DB': '男双', 'WB': '女双', 'MX': '混双', 'XW': 'MX×WB', 'XD': 'MX×DB'}
     thin_border = None  # Keep template borders
     
     current_row = 3
