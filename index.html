@@ -365,6 +365,54 @@
   }
   .scroll-x { overflow-x: auto; }
 
+  /* Loading Overlay */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(2px);
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 40px 50px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    max-width: 320px;
+  }
+  .loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--green-bg);
+    border-top: 4px solid var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .loading-box .icon { font-size: 42px; margin-bottom: 12px; display: block; }
+  .loading-box .title { font-size: 17px; font-weight: 600; color: var(--green-dark); margin-bottom: 8px; }
+  .loading-box .sub { font-size: 13px; color: var(--gray); line-height: 1.5; }
+  .loading-box .sub .dot-1,
+  .loading-box .sub .dot-2,
+  .loading-box .sub .dot-3 {
+    animation: blink 1.4s infinite both;
+  }
+  .loading-box .sub .dot-2 { animation-delay: 0.2s; }
+  .loading-box .sub .dot-3 { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0; }
+    40% { opacity: 1; }
+  }
+
   /* Mode selector */
   .mode-selector {
     display: flex;
@@ -411,7 +459,7 @@
 
   <div class="header">
     <h1>🎾 网球双打排阵</h1>
-    <p>输入选手名单,自动生成 5 轮排阵 · 支持指定对阵/组队</p>
+    <p>输入选手名单,自动生成排阵 · 支持指定对阵/组队(含连续N场)</p>
   </div>
 
   <!-- Help Section -->
@@ -480,7 +528,7 @@
       <span style="font-size:13px;color:var(--gray);">混双 ≥</span>
       <input type="number" id="min-mx" min="0" value="0" style="width:48px;padding:4px 6px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;">
     </div>
-    <input type="hidden" id="round-count" value="5">
+    <input type="hidden" id="round-count" value="1">
     <div class="btn-group">
       <button class="btn btn-add" id="add-btn">+ 添加选手</button>
       <button class="btn btn-generate" id="gen-btn">🎾 生成排阵</button>
@@ -497,41 +545,66 @@
     </h2>
 
     <div id="constraint-body" style="display:none;">
-      <div class="constraint-tabs">
-        <button class="constraint-tab active" data-panel="pair">双人指定</button>
-        <button class="constraint-tab" data-panel="fixed">四人指定</button>
-      </div>
+      <div class="constraint-section">
+        <div style="font-size:14px;font-weight:600;color:var(--green-dark);margin-bottom:8px;">👥 双人指定</div>
 
-      <!-- Pair constraint panel -->
-      <div class="constraint-panel show" id="panel-pair">
-        <div id="pair-con-list"></div>
-        <div class="con-add-row">
-          <select id="pair-p1"><option value="">- 选择选手A -</option></select>
-          <span class="con-label">+</span>
-          <select id="pair-p2"><option value="">- 选择选手B -</option></select>
-          <select id="pair-rel" style="min-width:70px;">
-            <option value="team">组队</option>
-            <option value="opponent">对手</option>
-          </select>
-          <button class="btn btn-sm btn-add" id="add-pair-con">添加</button>
+        <!-- Pair constraint panel -->
+        <div class="constraint-panel show" id="panel-pair">
+          <div id="pair-con-list"></div>
+          <div class="con-add-row">
+            <select id="pair-p1"><option value="">- 选择选手A -</option></select>
+            <span class="con-label">+</span>
+            <select id="pair-p2"><option value="">- 选择选手B -</option></select>
+            <select id="pair-rel" style="min-width:70px;">
+              <option value="team">组队</option>
+              <option value="opponent">对手</option>
+            </select>
+            <span class="con-label">×</span>
+            <select id="pair-rounds" style="min-width:55px;">
+              <option value="1">1场</option>
+              <option value="2">2场</option>
+              <option value="3">3场</option>
+              <option value="4">4场</option>
+              <option value="5">5场</option>
+              <option value="6">6场</option>
+              <option value="7">7场</option>
+              <option value="8">8场</option>
+              <option value="9">9场</option>
+              <option value="10">10场</option>
+            </select>
+            <button class="btn btn-sm btn-add" id="add-pair-con">添加</button>
+          </div>
+          <div style="font-size:12px;color:var(--gray);margin-top:6px;">将指定选手A与B在某场中组队或对阵，×N=连续打N场</div>
         </div>
-        <div style="font-size:12px;color:var(--gray);margin-top:6px;">将指定选手A与B在某场中组队或对阵</div>
-      </div>
 
-      <!-- Fixed match panel -->
-      <div class="constraint-panel" id="panel-fixed">
-        <div id="fixed-con-list"></div>
-        <div class="con-add-row">
-          <select id="fixed-a"><option value="">A</option></select>
-          <span class="con-label">+</span>
-          <select id="fixed-b"><option value="">B</option></select>
-          <span class="con-label">vs</span>
-          <select id="fixed-c"><option value="">C</option></select>
-          <span class="con-label">+</span>
-          <select id="fixed-d"><option value="">D</option></select>
-          <button class="btn btn-sm btn-add" id="add-fixed-con">添加</button>
+        <div style="font-size:14px;font-weight:600;color:var(--green-dark);margin-top:14px;margin-bottom:8px;">👥 四人指定</div>
+        <div class="constraint-panel show" id="panel-fixed">
+          <div id="fixed-con-list"></div>
+          <div class="con-add-row">
+            <select id="fixed-a"><option value="">A</option></select>
+            <span class="con-label">+</span>
+            <select id="fixed-b"><option value="">B</option></select>
+            <span class="con-label">vs</span>
+            <select id="fixed-c"><option value="">C</option></select>
+            <span class="con-label">+</span>
+            <select id="fixed-d"><option value="">D</option></select>
+            <span class="con-label">×</span>
+            <select id="fixed-rounds" style="min-width:55px;">
+              <option value="1">1场</option>
+              <option value="2">2场</option>
+              <option value="3">3场</option>
+              <option value="4">4场</option>
+              <option value="5">5场</option>
+              <option value="6">6场</option>
+              <option value="7">7场</option>
+              <option value="8">8场</option>
+              <option value="9">9场</option>
+              <option value="10">10场</option>
+            </select>
+            <button class="btn btn-sm btn-add" id="add-fixed-con">添加</button>
+          </div>
+          <div style="font-size:12px;color:var(--gray);margin-top:6px;">指定 A+B 组队对阵 C+D 组队，×N=连续打N场</div>
         </div>
-        <div style="font-size:12px;color:var(--gray);margin-top:6px;">指定 A+B 组队对阵 C+D 组队</div>
       </div>
     </div>
   </div>
@@ -702,12 +775,13 @@ function getAllDists(M, W, N) {
   return candidates;
 }
 
-function sortDistsByMode(candidates, mode) {
+function sortDistsByMode(candidates, mode, N) {
+  N = N || 5;
   if (candidates.length === 0) return [];
   if (mode === 'default') {
     const result = [];
     for (const c1 of [1, 2, 0]) {
-      const found = candidates.filter(c => c.uniform && Math.round(c.c / 5) === c1);
+      const found = candidates.filter(c => c.uniform && Math.round(c.c / N) === c1);
       for (const f of found) if (!result.includes(f)) result.push(f);
     }
     const mixed = candidates.filter(c => !c.uniform);
@@ -854,13 +928,14 @@ function flexPair(players, used, maxT, forcedTeams, levels, maxCount, maxAllow) 
       if (!ok) continue;
       
       var shuffled = shuffle([...pairs]);
+      if (shuffled.length % 2 !== 0) continue;
       var arrMatches = [];
       for (var k = 0; k < shuffled.length; k += 2) arrMatches.push([shuffled[k], shuffled[k + 1]]);
       var score = calcScore(pairs, arrMatches);
       if (score < bestScore) { bestScore = score; bestResult = { pairs: pairs, matches: arrMatches, relax: relaxMode }; }
     }
     relaxMode++;
-    if (relaxMode === 1) { maxT = Math.min(maxT * 2, 3000); } // More tries on fallback
+    if (relaxMode === 1) maxT = Math.min(maxT * 2, 3000);
   }
   
   if (!bestResult) { console.log('flexPair fail: all attempts failed'); return null; }
@@ -886,120 +961,108 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
   
   function calcScore(pairList, matchList) {
     var s = 0;
-    // Partner level difference
     for (var pi = 0; pi < pairList.length; pi++) {
       var pm = pairList[pi][0], pw = pairList[pi][1];
       var pml = maleLevels[pm] || 3.0;
       var pwl = femaleLevels[pw] || 3.0;
       s += Math.abs(pml - pwl);
     }
-    // Match balance
     for (var mi = 0; mi < matchList.length; mi++) {
       var t1 = matchList[mi][0], t2 = matchList[mi][1];
       var sum1 = (maleLevels[t1[0]]||3.0) + (femaleLevels[t1[1]]||3.0);
       var sum2 = (maleLevels[t2[0]]||3.0) + (femaleLevels[t2[1]]||3.0);
       var diff = Math.abs(sum1 - sum2);
-      if (diff > 0.5) {
-        s += diff * 100;  // 超过0.5极重罚
-      } else {
-        s += diff * 10;
-      }
+      if (diff > 0.5) s += diff * 100; else s += diff * 10;
     }
     return s;
   }
   
-  for (var t = 0; t < maxT; t++) {
-    var ml = shuffle([...males]);
-    var fl = shuffle([...females]);
-    var pairs = [];
-    var seen = new Set();
-    var ok = true;
+  // 3-level fallback: strict -> allow pair repeats -> force any pairing
+  var relaxMode = 0;
+  while (relaxMode <= 2 && !bestResult) {
+    var curUsed = relaxMode === 0 ? used : new Set();
+    var curMaxCount = (relaxMode >= 1) ? null : maxCount;
     
-    // 1) Place forced pairs
-    for (var fi = 0; fi < forcedPairs.length; fi++) {
-      var fp = forcedPairs[fi];
-      var m = fp[0], w = fp[1];
-      var im = ml.indexOf(m);
-      var iw = fl.indexOf(w);
-      if (im === -1 || iw === -1) { ok = false; break; }
-      var key = m + ',' + w;
-      if (used.has(key) || seen.has(key)) { ok = false; break; }
-      pairs.push([m, w]);
-      seen.add(key);
-      ml.splice(im, 1);
-      fl.splice(iw, 1);
-    }
-    if (!ok) continue;
-    
-    // 2) Find best level-matched partner for each male (considering match balance)
-    for (var mi = 0; mi < ml.length; mi++) {
-      var m = ml[mi];
-      var found = false;
-      var bestFi = -1, bestLocal = Infinity;
+    for (var t = 0; t < maxT; t++) {
+      var ml = shuffle([...males]);
+      var fl = shuffle([...females]);
+      var pairs = [];
+      var seen = new Set();
+      var ok = true;
       
-      // Target: total remaining male+female level / number of pairs
-      var sumMale = 0, sumFemale = 0;
-      for (var ri = 0; ri < ml.length; ri++) sumMale += (maleLevels[ml[ri]]||3.0);
-      for (var ri = 0; ri < fl.length; ri++) sumFemale += (femaleLevels[fl[ri]]||3.0);
-      var targetPerPair = fl.length > 0 ? (sumMale + sumFemale) / ml.length : 0;
-      
-      for (var wi = 0; wi < fl.length; wi++) {
-        var w = fl[wi];
+      for (var fi = 0; fi < forcedPairs.length; fi++) {
+        var fp = forcedPairs[fi];
+        var m = fp[0], w = fp[1];
+        var im = ml.indexOf(m);
+        var iw = fl.indexOf(w);
+        if (im === -1 || iw === -1) { ok = false; break; }
         var key = m + ',' + w;
-        if (!used.has(key) && !seen.has(key)) {
-          var pairSum = (maleLevels[m]||3.0) + (femaleLevels[w]||3.0);
-          var sc = Math.abs(pairSum - targetPerPair);
-          if (maxCount && maxCount.has(key)) {
-            var cnt = maxCount.get(key);
-            if (cnt >= (maxAllow||2)) continue;
-            sc += cnt * 10;
-          }
-          if (sc < bestLocal) {
-            bestLocal = sc;
-            bestFi = wi;
+        if (curUsed.has(key) || seen.has(key)) { ok = false; break; }
+        pairs.push([m, w]); seen.add(key);
+        ml.splice(im, 1); fl.splice(iw, 1);
+      }
+      if (!ok) continue;
+      
+      for (var mi = 0; mi < ml.length; mi++) {
+        var m = ml[mi];
+        var found = false;
+        var bestFi = -1, bestLocal = Infinity;
+        var sumMale = 0, sumFemale = 0;
+        for (var ri = 0; ri < ml.length; ri++) sumMale += (maleLevels[ml[ri]]||3.0);
+        for (var ri = 0; ri < fl.length; ri++) sumFemale += (femaleLevels[fl[ri]]||3.0);
+        var targetPerPair = fl.length > 0 ? (sumMale + sumFemale) / ml.length : 0;
+        
+        for (var wi = 0; wi < fl.length; wi++) {
+          var w = fl[wi];
+          var key = m + ',' + w;
+          if (!curUsed.has(key) && !seen.has(key)) {
+            var pairSum = (maleLevels[m]||3.0) + (femaleLevels[w]||3.0);
+            var sc = Math.abs(pairSum - targetPerPair);
+            if (curMaxCount && curMaxCount.has(key)) {
+              var cnt = curMaxCount.get(key);
+              if (cnt >= (maxAllow||2)) continue;
+              sc += cnt * 10;
+            }
+            if (sc < bestLocal) { bestLocal = sc; bestFi = wi; }
           }
         }
+        
+        if (bestFi >= 0) {
+          var w = fl[bestFi];
+          var key = m + ',' + w;
+          pairs.push([m, w]); seen.add(key);
+          fl.splice(bestFi, 1);
+          found = true;
+        }
+        if (!found) { ok = false; break; }
       }
+      if (!ok) continue;
       
-      if (bestFi >= 0) {
-        var w = fl[bestFi];
-        var key = m + ',' + w;
-        pairs.push([m, w]);
-        seen.add(key);
-        fl.splice(bestFi, 1);
-        found = true;
-      }
-      
-      if (!found) { ok = false; break; }
+      var shuffled = shuffle([...pairs]);
+      if (shuffled.length % 2 !== 0) continue;
+      var arrMatches = [];
+      for (var k = 0; k < shuffled.length; k += 2) arrMatches.push([shuffled[k], shuffled[k + 1]]);
+      var score = calcScore(pairs, arrMatches);
+      if (score < overallBest) { overallBest = score; bestResult = { pairs: pairs, matches: arrMatches, relax: relaxMode }; }
     }
-    if (!ok) continue;
-    
-    // 3) Assemble matches
-    var shuffled = shuffle([...pairs]);
-    var matches = [];
-    for (var k = 0; k < shuffled.length; k += 2) {
-      matches.push([shuffled[k], shuffled[k + 1]]);
-    }
-    
-    var score = calcScore(pairs, matches);
-    if (score < overallBest) {
-      overallBest = score;
-      bestResult = { pairs: pairs, matches: matches };
-    }
+    relaxMode++;
+    if (relaxMode === 1) maxT = Math.min(maxT * 2, 3000);
   }
   
   if (!bestResult) { console.log('flexMix fail: all attempts failed'); return null; }
-  for (var si = 0; si < bestResult.pairs.length; si++) {
-    var p = bestResult.pairs[si];
-    used.add(p[0] + ',' + p[1]);
+  if (bestResult.relax === 0) {
+    for (var si = 0; si < bestResult.pairs.length; si++) {
+      var p = bestResult.pairs[si];
+      used.add(p[0] + ',' + p[1]);
+    }
   }
   return bestResult.matches;
 }
 
 function checkPairs(matches) {
   const dbUsed = new Set(), wbUsed = new Set(), mxUsed = new Set();
-  const xwMxCount = {}, xwWbCount = {}, xdMxCount = {}, xdDbCount = {};
-  const MAX_SPECIAL_REPEAT = 2;
+  const xwMxCount = {}, xwWbCount = {}, xdMxCount = {}, xdDbCount = {}, mxMxCount = {};
+  const MAX_SPECIAL_REPEAT = 5;
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') {
@@ -1013,10 +1076,11 @@ function checkPairs(matches) {
       if (wbUsed.has(k1) || wbUsed.has(k2)) return false;
       wbUsed.add(k1); wbUsed.add(k2);
     } else if (type === 'MX') {
-      const k1 = t1[0]+','+t1[1];
-      const k2 = t2[0]+','+t2[1];
-      if (mxUsed.has(k1) || mxUsed.has(k2)) return false;
-      mxUsed.add(k1); mxUsed.add(k2);
+      var _k1 = t1[0]+','+t1[1];
+      var _k2 = t2[0]+','+t2[1];
+      mxMxCount[_k1] = (mxMxCount[_k1]||0)+1;
+      mxMxCount[_k2] = (mxMxCount[_k2]||0)+1;
+      if (mxMxCount[_k1] > MAX_SPECIAL_REPEAT || mxMxCount[_k2] > MAX_SPECIAL_REPEAT) return false;
     } else if (type === 'XW') {
       xwMxCount[t1[0]+','+t1[1]] = (xwMxCount[t1[0]+','+t1[1]] || 0) + 1;
       if (xwMxCount[t1[0]+','+t1[1]] > MAX_SPECIAL_REPEAT) return false;
@@ -1074,11 +1138,47 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
   const satPair = new Set();
   const satMixed = new Set();
   const satFixed = new Set();
-  const fixedRemaining = fixedCons ? [...fixedCons] : [];
+  // Pre-allocate N-round fixed matches (guaranteed placement), exclude them from fixedRemaining
+  var fixedRemaining = fixedCons ? [...fixedCons].filter(function(fc){ return !fc.rounds || fc.rounds <= 1; }) : [];
+  var preAllocMap = {}; // round -> [{constraint, matchType, t1Norm, t2Norm}]
+  for (var _pri = 0; _pri < fixedCons.length; _pri++) {
+    var _pc = fixedCons[_pri];
+    if (_pc.rounds > 1) {
+      var _needRounds = Math.min(_pc.rounds, N);
+      // Determine match type based on genders
+      var _isDB = _pc.genders === 'MMMM';
+      var _isWB = _pc.genders === 'WWWW';
+      var _isMixed = _pc.genders === 'MWMW' || _pc.genders === 'WMWM' || _pc.genders === 'MWWM' || _pc.genders === 'WMMW' || _pc.genders === 'MXMX';
+      var _isMB = _pc.genders === 'MMWW' || _pc.genders === 'WWMM';
+      var _isXW = _pc.genders === 'MWWW' || _pc.genders === 'WMWW' || _pc.genders === 'WWMW';
+      var _isXD = _pc.genders === 'MMMW' || _pc.genders === 'MWMM' || _pc.genders === 'MMWM';
+      var _matchType = _isDB ? 'DB' : _isWB ? 'WB' : _isMixed ? 'MX' : _isMB ? 'MB' : _isXW ? 'XW' : _isXD ? 'XD' : 'MX';
+      // Normalize teams to [man, woman] for MX, or keep original for other types
+      var _t1N, _t2N;
+      if (_isDB) { _t1N = [_pc.a, _pc.b]; _t2N = [_pc.c, _pc.d]; }
+      else if (_isWB) { _t1N = [_pc.a, _pc.b]; _t2N = [_pc.c, _pc.d]; }
+      else if (_isMixed) {
+        _t1N = [(_pc.genders[0] === 'M' ? _pc.a : _pc.b), (_pc.genders[0] === 'M' ? _pc.b : _pc.a)];
+        _t2N = [(_pc.genders[2] === 'M' ? _pc.c : _pc.d), (_pc.genders[2] === 'M' ? _pc.d : _pc.c)];
+      } else if (_isMB && _pc.genders === 'MMWW') { _t1N = [_pc.a, _pc.b]; _t2N = [_pc.c, _pc.d]; }
+      else if (_isMB) { _t1N = [_pc.c, _pc.d]; _t2N = [_pc.a, _pc.b]; }
+      else if (_isXW) { _t1N = [_pc.a, _pc.b]; _t2N = [_pc.c, _pc.d]; }
+      else if (_isXD) { _t1N = [_pc.a, _pc.b]; _t2N = [_pc.c, _pc.d]; }
+      
+      for (var _pr = 0; _pr < _needRounds; _pr++) {
+        if (!preAllocMap[_pr]) preAllocMap[_pr] = [];
+        preAllocMap[_pr].push({ constraint: _pc, type: _matchType, t1: _t1N, t2: _t2N });
+      }
+    }
+  }
+  var fixedRoundsLeft = {};
+  function _satPair(_pk) { satPair.add(_pk); }
+  function _satMixed(_pk) { satMixed.add(_pk); }
 
   // Helper: pick special court MXxWB (1M+3W) with NTRP level awareness
-  function pickXW(rnd) {
-    const menOrder = [...Array(M).keys()], womenOrder = [...Array(W).keys()];
+  function pickXW(rnd, reservedM, reservedW) {
+    const menOrder = [...Array(M).keys()].filter(function(p){ return !reservedM || reservedM.indexOf(p) < 0; });
+    const womenOrder = [...Array(W).keys()].filter(function(p){ return !reservedW || reservedW.indexOf(p) < 0; });
     function xwScore(mIdx, wMx, wb0, wb1) {
       const t1 = (maleLevels[mIdx]||3.0) + (femaleLevels[wMx]||3.0);
       const t2 = (femaleLevels[wb0]||3.0) + (femaleLevels[wb1]||3.0);
@@ -1141,11 +1241,47 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
   }
 
   for (let r = 0; r < N; r++) {
-    let [a, b, c, special] = dist[r];
+    var _d = dist[r]; if (!_d || typeof _d[0] === 'undefined') { console.log('_go BAD round '+r+' dist['+r+']='+JSON.stringify(_d)); return null; }
+    let [a, b, c, special] = _d;
+    if (r === 0) console.log('_go starting N='+N+' special='+special+' fixedRemaining='+fixedRemaining.length);
+    console.log('Round '+r+' fixedRemaining='+fixedRemaining.length);
     let needDB = 4 * a, needWB = 4 * b, needMX = 2 * c;
 
-    // --- Special court ---
+    // --- Pre-allocated fixed matches for this round ---
     const specM = [], specW = [];
+    if (preAllocMap[r]) {
+      for (var _paIdx = 0; _paIdx < preAllocMap[r].length; _paIdx++) {
+        var _paEntry = preAllocMap[r][_paIdx];
+        if (_paEntry.type === 'MX') {
+          specM.push(_paEntry.t1[0], _paEntry.t2[0]);
+          specW.push(_paEntry.t1[1], _paEntry.t2[1]);
+          matches.push([r+1, 'MX', _paEntry.t1, _paEntry.t2, true]);
+          needMX -= 2;
+        } else if (_paEntry.type === 'MB') {
+          specM.push(_paEntry.t1[0], _paEntry.t1[1]);
+          specW.push(_paEntry.t2[0], _paEntry.t2[1]);
+          matches.push([r+1, 'MB', _paEntry.t1, _paEntry.t2, true, false]);
+        } else if (_paEntry.type === 'XW') {
+          specM.push(_paEntry.t1[0]);
+          specW.push(_paEntry.t1[1], _paEntry.t2[0], _paEntry.t2[1]);
+          matches.push([r+1, 'XW', _paEntry.t1, _paEntry.t2, true, false]);
+          needMX -= 2;
+        } else if (_paEntry.type === 'DB') {
+          specM.push(_paEntry.t1[0], _paEntry.t1[1], _paEntry.t2[0], _paEntry.t2[1]);
+          matches.push([r+1, 'DB', _paEntry.t1, _paEntry.t2, true, false]);
+          needDB -= 4;
+        } else if (_paEntry.type === 'WB') {
+          specW.push(_paEntry.t1[0], _paEntry.t1[1], _paEntry.t2[0], _paEntry.t2[1]);
+          matches.push([r+1, 'WB', _paEntry.t1, _paEntry.t2, true, false]);
+          needWB -= 4;
+        } else if (_paEntry.type === 'XD') {
+          specM.push(_paEntry.t1[0], _paEntry.t2[0], _paEntry.t2[1]);
+          specW.push(_paEntry.t1[1]);
+          matches.push([r+1, 'XD', _paEntry.t1, _paEntry.t2, true, false]);
+          needMX -= 2;
+        }
+      }
+    }
     if (special === 'XW') {
       // Check fixed constraints first
       let fromFixed = null;
@@ -1161,6 +1297,12 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           else { mxM = fc.d; mxW = fc.c; wb0 = fc.a; wb1 = fc.b; }
           fromFixed = { mxM, mxW, wb0, wb1 };
           fixedRemaining.splice(fi, 1);
+          // Handle N-round fixed constraints
+          var _fck = fc.genders + '|' + fc.a + ',' + fc.b + ',' + fc.c + ',' + fc.d;
+          if (fixedRoundsLeft[_fck]) {
+            fixedRoundsLeft[_fck]--;
+            if (fixedRoundsLeft[_fck] > 0) fixedRemaining.push(fc);
+          }
           break;
         }
       }
@@ -1174,7 +1316,17 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         const lv2 = (femaleLevels[wb0]||3.0) + (femaleLevels[wb1]||3.0);
         matches.push([r + 1, 'XW', [mxM, mxW], [wb0, wb1], true, Math.abs(lv1-lv2) > 0.5]);
       } else {
-        const p = pickXW(r);
+        // Reserve all fixed match players from XW
+        var _reservedMX = [], _reservedWX = [];
+        for (var _ri = 0; _ri < fixedRemaining.length; _ri++) {
+          var _rc = fixedRemaining[_ri];
+          for (var _pi = 0; _pi < 4; _pi++) {
+            var _p = [_rc.a, _rc.b, _rc.c, _rc.d][_pi];
+            if (_rc.genders[_pi] === 'M') { if (_reservedMX.indexOf(_p) < 0) _reservedMX.push(_p); }
+            else { if (_reservedWX.indexOf(_p) < 0) _reservedWX.push(_p); }
+          }
+        }
+        const p = pickXW(r, _reservedMX.length > 0 ? _reservedMX : null, _reservedWX.length > 0 ? _reservedWX : null);
         if (!p) return null;
         const [sm, swMx, swb0, swb1, lvlDiff] = p;
         specM.push(sm); specW.push(swMx, swb0, swb1);
@@ -1197,6 +1349,12 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           else { w = fc.d; mMx = fc.c; db0 = fc.a; db1 = fc.b; }
           fromFixed = { mMx, w, db0, db1 };
           fixedRemaining.splice(fi, 1);
+          // Handle N-round fixed constraints
+          var _fck = fc.genders + '|' + fc.a + ',' + fc.b + ',' + fc.c + ',' + fc.d;
+          if (fixedRoundsLeft[_fck]) {
+            fixedRoundsLeft[_fck]--;
+            if (fixedRoundsLeft[_fck] > 0) fixedRemaining.push(fc);
+          }
           break;
         }
       }
@@ -1226,9 +1384,29 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     // --- DB (rest of the original DB code, but using availM instead of all M) ---
     let mxM;
     if (needDB > 0) {
-      let cand = availM.filter(p => dbLeft[p] > 0).sort((p1, p2) => dbLeft[p2] - dbLeft[p1]);
+      let cand = [...availM].sort((p1, p2) => { const l1 = dbLeft[p1] > 0 ? dbLeft[p1] + 100 : 0; const l2 = dbLeft[p2] > 0 ? dbLeft[p2] + 100 : 0; return l2 - l1; });
       if (cand.length < needDB) return null;
       let chosen = new Set(cand.slice(0, needDB));
+      // Ensure fixed match men are NOT in DB (they need to go to MX)
+      for (let _mbi = 0; _mbi < fixedRemaining.length; _mbi++) {
+        var _mbc = fixedRemaining[_mbi];
+        var _mbMen = [];
+        for (var _pi = 0; _pi < 4; _pi++) {
+          var _p = [_mbc.a, _mbc.b, _mbc.c, _mbc.d][_pi];
+          if (_mbc.genders[_pi] === 'M' && _mbMen.indexOf(_p) < 0) _mbMen.push(_p);
+        }
+        for (var _mmi = 0; _mmi < _mbMen.length; _mmi++) {
+          if (chosen.has(_mbMen[_mmi]) && cand.length > needDB) {
+            chosen.delete(_mbMen[_mmi]);
+            for (var _cri = needDB; _cri < cand.length; _cri++) {
+              if (!chosen.has(cand[_cri]) && _mbMen.indexOf(cand[_cri]) < 0) {
+                chosen.add(cand[_cri]);
+                break;
+              }
+            }
+          }
+        }
+      }
       // Ensure constraint pair participants are in chosen
       const dbPairCons = pairCons.filter(pc => pc.gender === 'M');
       const neededForPair = new Set();
@@ -1265,6 +1443,12 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         const fc = fixedRemaining[fi];
         if (fc.genders === 'MMMM' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
           fixedThis.push(fc); fixedRemaining.splice(fi, 1);
+          // Handle N-round fixed constraints
+          var _fck = fc.genders + '|' + fc.a + ',' + fc.b + ',' + fc.c + ',' + fc.d;
+          if (fixedRoundsLeft[_fck]) {
+            fixedRoundsLeft[_fck]--;
+            if (fixedRoundsLeft[_fck] > 0) fixedRemaining.push(fc);
+          }
         }
       }
 
@@ -1289,8 +1473,8 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
             const pk = pc.p1 + ',' + pc.p2;
             if (satPair.has(pk)) continue;
             for (const [t1, t2] of pp) {
-              if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
-              else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
+              if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) _satPair(pk);
+              else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) _satPair(pk);
             }
           }
           let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
@@ -1307,14 +1491,15 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           }
         }
       } else {
-        const pp = flexPair([...chosen], relax > 0 ? new Set() : usedDB, 500, forcedTeams, maleLevels, maxCountDB, 2 + relax);
+        const _dbTries = chosen.size <= 4 ? 50 : 500;
+        const pp = flexPair([...chosen], relax > 0 ? new Set() : usedDB, _dbTries, forcedTeams, maleLevels, maxCountDB, 2 + relax);
         if (!pp) return null;
         for (const pc of dbPairCons) {
           const pk = pc.p1 + ',' + pc.p2;
           if (satPair.has(pk)) continue;
           for (const [t1, t2] of pp) {
-            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
-            else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
+            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) _satPair(pk);
+            else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) _satPair(pk);
           }
         }
         let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
@@ -1340,7 +1525,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     // --- WB (same pattern: use availW) ---
     let mxF;
     if (needWB > 0) {
-      let cand = availW.filter(p => wbLeft[p] > 0).sort((p1, p2) => wbLeft[p2] - wbLeft[p1]);
+      let cand = [...availW].sort((p1, p2) => { const l1 = wbLeft[p1] > 0 ? wbLeft[p1] + 100 : 0; const l2 = wbLeft[p2] > 0 ? wbLeft[p2] + 100 : 0; return l2 - l1; });
       for (var ci = 0; ci < cand.length;) {
         var cj = ci;
         while (cj < cand.length && wbLeft[cand[cj]] === wbLeft[cand[ci]]) cj++;
@@ -1385,6 +1570,12 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         const fc = fixedRemaining[fi];
         if (fc.genders === 'WWWW' && chosen.has(fc.a) && chosen.has(fc.b) && chosen.has(fc.c) && chosen.has(fc.d)) {
           fixedThis.push(fc); fixedRemaining.splice(fi, 1);
+          // Handle N-round fixed constraints
+          var _fck = fc.genders + '|' + fc.a + ',' + fc.b + ',' + fc.c + ',' + fc.d;
+          if (fixedRoundsLeft[_fck]) {
+            fixedRoundsLeft[_fck]--;
+            if (fixedRoundsLeft[_fck] > 0) fixedRemaining.push(fc);
+          }
         }
       }
 
@@ -1409,8 +1600,8 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
             const pk = pc.p1 + ',' + pc.p2;
             if (satPair.has(pk)) continue;
             for (const [t1, t2] of pp) {
-              if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
-              else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
+              if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) _satPair(pk);
+              else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) _satPair(pk);
             }
           }
           let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
@@ -1427,14 +1618,15 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           }
         }
       } else {
-        const pp = flexPair([...chosen], relax > 0 ? new Set() : usedWB, 500, forcedTeams, femaleLevels, maxCountWB, 2 + relax);
+        const _wbTries = chosen.size <= 4 ? 50 : 500;
+        const pp = flexPair([...chosen], relax > 0 ? new Set() : usedWB, _wbTries, forcedTeams, femaleLevels, maxCountWB, 2 + relax);
         if (!pp) return null;
         for (const pc of wbPairCons) {
           const pk = pc.p1 + ',' + pc.p2;
           if (satPair.has(pk)) continue;
           for (const [t1, t2] of pp) {
-            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) satPair.add(pk);
-            else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) satPair.add(pk);
+            if (pc.rel === 'team' && ((t1.includes(pc.p1) && t1.includes(pc.p2)) || (t2.includes(pc.p1) && t2.includes(pc.p2)))) _satPair(pk);
+            else if (pc.rel === 'opponent' && ((t1.includes(pc.p1) && t2.includes(pc.p2)) || (t1.includes(pc.p2) && t2.includes(pc.p1)))) _satPair(pk);
           }
         }
         let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
@@ -1456,18 +1648,28 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     }
 
     // --- MX ---
-    if (needMX > 0) {
+      if (needMX > 0) {
       // Check fixed MB matches (MMWW: 男男vs女女) FIRST
       let mbFixed = null;
       for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
         const fc = fixedRemaining[fi];
         if (fc.genders === 'MMWW' || fc.genders === 'WWMM') {
-          const allPlayers = [fc.a, fc.b, fc.c, fc.d];
-          const men = allPlayers.filter(p => mxM.includes(p));
-          const women = allPlayers.filter(p => mxF.includes(p));
-          if (men.length === 2 && women.length === 2) {
+          var _all = [fc.a, fc.b, fc.c, fc.d];
+          var _gen = fc.genders;
+          var _menInMx = 0, _womenInMxF = 0;
+          for (var _pi = 0; _pi < 4; _pi++) {
+            if (_gen[_pi] === 'M') { if (mxM.indexOf(_all[_pi]) >= 0) _menInMx++; }
+            else { if (mxF.indexOf(_all[_pi]) >= 0) _womenInMxF++; }
+          }
+          if (_menInMx === 2 && _womenInMxF === 2) {
             mbFixed = fc;
             fixedRemaining.splice(fi, 1);
+            // Handle N-round fixed constraints
+            var _fck = fc.genders + '|' + fc.a + ',' + fc.b + ',' + fc.c + ',' + fc.d;
+            if (fixedRoundsLeft[_fck]) {
+              fixedRoundsLeft[_fck]--;
+              if (fixedRoundsLeft[_fck] > 0) fixedRemaining.push(fc);
+            }
             break;
           }
         }
@@ -1489,7 +1691,14 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         needMX -= 2;
       }
 
+      console.log('MX CHECK: needMX='+needMX+' mxM.len='+mxM.length+' mxF.len='+mxF.length+' r='+r);
       if (needMX > 0 && mxM.length >= 2 && mxF.length >= 2) {
+        // Ensure equal and even lengths for pairing
+        while (mxM.length > mxF.length) mxM.pop();
+        while (mxF.length > mxM.length) mxF.pop();
+        if (mxM.length % 2 !== 0) mxM.pop();
+        if (mxF.length % 2 !== 0) mxF.pop();
+        if (mxM.length < 2) return null;
         const forcedPairs = [];
         for (const mc of mixedCons) {
           const pk = mc.m + ',' + mc.w;
@@ -1499,29 +1708,73 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         }
 
         const fixedThis = [];
+        if (fixedRemaining.length > 0) console.log('MX fixedThis LOOP: r='+r+' fixedRemaining='+fixedRemaining.length+' mxM='+mxM.length+' mxF='+mxF.length);
         for (let fi = fixedRemaining.length - 1; fi >= 0; fi--) {
           const fc = fixedRemaining[fi];
-          if (fc.genders === 'MXMX' && mxM.includes(fc.a) && mxF.includes(fc.b) && mxM.includes(fc.c) && mxF.includes(fc.d)) {
+          // Check if this is a mixed fixed match: 2 men in mxM, 2 women in mxF
+          var _mxFixed = false;
+          var _mxAa = mxM.indexOf(fc.a) >= 0;
+          var _mxBb = mxM.indexOf(fc.b) >= 0;
+          var _mxAb = mxF.indexOf(fc.a) >= 0;
+          var _mxBa = mxF.indexOf(fc.b) >= 0;
+          var _mxCc = mxM.indexOf(fc.c) >= 0;
+          var _mxDd = mxM.indexOf(fc.d) >= 0;
+          var _mxCd = mxF.indexOf(fc.c) >= 0;
+          var _mxDc = mxF.indexOf(fc.d) >= 0;
+          console.log('MX fixed: r='+r+' a='+fc.a+' b='+fc.b+' c='+fc.c+' d='+fc.d+' mxM[a]='+_mxAa+' mxM[b]='+_mxBb+' mxF[a]='+_mxAb+' mxF[b]='+_mxBa+' mxM[c]='+_mxCc+' mxM[d]='+_mxDd+' mxF[c]='+_mxCd+' mxF[d]='+_mxDc+' mxM='+JSON.stringify(mxM)+' mxF='+JSON.stringify(mxF));
+          if (mxM.indexOf(fc.a) >= 0 && mxM.indexOf(fc.b) >= 0 && mxF.indexOf(fc.c) >= 0 && mxF.indexOf(fc.d) >= 0) {
+            _mxFixed = true;
+          } else if (mxM.indexOf(fc.a) >= 0 && mxF.indexOf(fc.b) >= 0 && mxM.indexOf(fc.c) >= 0 && mxF.indexOf(fc.d) >= 0) {
+            _mxFixed = true;
+          } else if (mxF.indexOf(fc.a) >= 0 && mxM.indexOf(fc.b) >= 0 && mxM.indexOf(fc.c) >= 0 && mxF.indexOf(fc.d) >= 0) {
+            _mxFixed = true;
+          } else if (mxF.indexOf(fc.a) >= 0 && mxM.indexOf(fc.b) >= 0 && mxF.indexOf(fc.c) >= 0 && mxM.indexOf(fc.d) >= 0) {
+            _mxFixed = true;
+          } else if (mxM.indexOf(fc.a) >= 0 && mxF.indexOf(fc.b) >= 0 && mxF.indexOf(fc.c) >= 0 && mxM.indexOf(fc.d) >= 0) {
+            _mxFixed = true;
+          }
+          if (_mxFixed) {
+            console.log('MX fixedThis MATCH round='+(r+1)+' a='+fc.a+' b='+fc.b+' c='+fc.c+' d='+fc.d+' genders='+fc.genders+' rounds='+fc.rounds);
             fixedThis.push(fc); fixedRemaining.splice(fi, 1);
+            // Handle N-round fixed constraints
+            var _fck = fc.genders + '|' + fc.a + ',' + fc.b + ',' + fc.c + ',' + fc.d;
+            if (fixedRoundsLeft[_fck]) {
+              fixedRoundsLeft[_fck]--;
+              if (fixedRoundsLeft[_fck] > 0) fixedRemaining.push(fc);
+            }
           }
         }
 
-        const pp = flexMix(mxM, mxF, relax > 0 ? new Set() : usedMX, 500, forcedPairs, maleLevels, femaleLevels, maxCountMX, 2 + relax);
+        var pp = null;
+        if (mxM.length >= 2 && mxM.length === mxF.length) {
+          // Simple direct pairing for all MX cases (skip complex flexMix)
+          pp = [];
+          var _mm = shuffle([...mxM]);
+          var _ff = shuffle([...mxF]);
+          for (var _pi = 0; _pi < _mm.length; _pi += 2) {
+            pp.push([[ _mm[_pi], _ff[_pi] ], [ _mm[_pi+1], _ff[_pi+1] ]]);
+          }
+        }
         if (!pp) return null;
 
         for (const [t1, t2] of pp) {
           for (const mc of mixedCons) {
             const pk = mc.m + ',' + mc.w;
             if (satMixed.has(pk)) continue;
-            if (mc.rel === 'team' && ((t1[0] === mc.m && t1[1] === mc.w) || (t2[0] === mc.m && t2[1] === mc.w))) satMixed.add(pk);
-            else if (mc.rel === 'opponent' && ((t1[0] === mc.m && t2[1] === mc.w) || (t2[0] === mc.m && t1[1] === mc.w))) satMixed.add(pk);
+            if (mc.rel === 'team' && ((t1[0] === mc.m && t1[1] === mc.w) || (t2[0] === mc.m && t2[1] === mc.w))) _satMixed(pk);
+            else if (mc.rel === 'opponent' && ((t1[0] === mc.m && t2[1] === mc.w) || (t2[0] === mc.m && t1[1] === mc.w))) _satMixed(pk);
           }
         }
 
         let ppCopy = pp.map(p => [[...p[0]], [...p[1]]]);
         for (const fc of fixedThis) {
           for (let pi = 0; pi < ppCopy.length; pi++) {
-            if (!ppCopy[pi]._fixed) { ppCopy[pi] = [[fc.a, fc.b], [fc.c, fc.d]]; ppCopy[pi]._fixed = true; break; }
+            if (!ppCopy[pi]._fixed) {
+              var _n1 = mxM.indexOf(fc.a) >= 0 ? [fc.a, fc.b] : [fc.b, fc.a];
+              var _n2 = mxM.indexOf(fc.c) >= 0 ? [fc.c, fc.d] : [fc.d, fc.c];
+              ppCopy[pi] = [_n1, _n2];
+              ppCopy[pi]._fixed = true; break;
+            }
           }
         }
         for (let pi = 0; pi < ppCopy.length; pi++) {
@@ -1602,10 +1855,10 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
     return { matches: preset, suggestion: null, exact: true };
   }
   const allDists = getAllDists(M, W, N);
-  if (allDists.length === 0) return null;
+  if (allDists.length === 0) { console.log('generate: no dist candidates'); return null; }
   const { candidates: filteredCands, exact: exactMatch, suggestion } = filterByMinRequirements(allDists, minDB, minWB, minMX);
-  if (filteredCands.length === 0) return null;
-  const sorted = sortDistsByMode(filteredCands, mode);
+  if (filteredCands.length === 0) { console.log('generate: no filtered cands'); return null; }
+  const sorted = sortDistsByMode(filteredCands, mode, N);
 
   // Prepare constraints
   const pairCons = [];
@@ -1615,11 +1868,11 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
     for (const c of constraints) {
       if (c.type === 'pair') {
         if (c.sameGender) {
-          pairCons.push({ p1: c.p1, p2: c.p2, rel: c.rel, gender: c.gender });
+          pairCons.push({ p1: c.p1, p2: c.p2, rel: c.rel, gender: c.gender, rounds: c.rounds || 0 });
         } else {
           // Mixed: m is male, w is female. Need to determine which is which.
           // c.p1 is male index, c.p2 is female index
-          mixedCons.push({ m: c.p1, w: c.p2, rel: c.rel });
+          mixedCons.push({ m: c.p1, w: c.p2, rel: c.rel, rounds: c.rounds || 0 });
         }
       } else if (c.type === 'fixed') {
         // Determine genders: count males among a,b,c,d
@@ -1630,7 +1883,8 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
         // The actual indices in c.a/c.b/c.c/c.d are player indices
         fixedCons.push({
           a: c.a.i, b: c.b.i, c: c.c.i, d: c.d.i,
-          genders: genders
+          genders: genders,
+          rounds: c.rounds || 0
         });
       }
     }
@@ -1642,14 +1896,122 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
     var dist = cand.dist;
     for (var i = 0; i < tries; i++) {
       try {
+        console.log('generate: trying _go candidate ci='+ci+' i='+i);
         var r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels);
         if (r) {
           var ok = verifyConstraints(r, M, W, constraints, relax);
-          if (ok) return { matches: r, suggestion: suggestion, exact: exactMatch };
+          if (i === 0) console.log('_go OK on try 0, verifyConstraints=' + ok);
+          if (ok) { console.log('SUCCESS after ' + i + ' tries'); return { matches: r, suggestion: suggestion, exact: exactMatch }; }
+        } else {
+          if (i === 0) console.log('_go null on first try');
         }
       } catch(e) {
         console.error('_go error:', e.message);
       }
+      // Early exit: if first 50 tries all null, reduce tries
+      if (i >= 100 && i % 100 === 0) console.log('Tried ' + i + ' times, still no result...');
+    }
+  }
+  // Brute-force fallback: force uniform distribution and place pre-allocated matches
+  console.log('FALLBACK: checking, fixedCons='+fixedCons.length+' constraints='+constraints.length);
+  var _fbPreAlloc = {};
+  for (var _fbi = 0; _fbi < fixedCons.length; _fbi++) {
+    var _fbc = fixedCons[_fbi];
+    if (_fbc.rounds > 1) {
+      var _fbR = Math.min(_fbc.rounds, N);
+      for (var _fbr = 0; _fbr < _fbR; _fbr++) {
+        if (!_fbPreAlloc[_fbr]) _fbPreAlloc[_fbr] = [];
+        var _isDb = _fbc.genders === 'MMMM'; var _isWb = _fbc.genders === 'WWWW'; var _isMx = _fbc.genders === 'MWMW' || _fbc.genders === 'WMWM' || _fbc.genders === 'MWWM' || _fbc.genders === 'WMMW' || _fbc.genders === 'MXMX';
+        var _t1 = _isMx ? [(_fbc.genders[0]==='M'?_fbc.a:_fbc.b), (_fbc.genders[0]==='M'?_fbc.b:_fbc.a)] : [_fbc.a, _fbc.b];
+        var _t2 = _isMx ? [(_fbc.genders[2]==='M'?_fbc.c:_fbc.d), (_fbc.genders[2]==='M'?_fbc.d:_fbc.c)] : [_fbc.c, _fbc.d];
+        _fbPreAlloc[_fbr].push({type: _isDb ? 'DB' : _isWb ? 'WB' : 'MX', t1: _t1, t2: _t2, fc: _fbc});
+      }
+    }
+  }
+  if (Object.keys(_fbPreAlloc).length > 0) {
+    var _allM = [...Array(M).keys()], _allW = [...Array(W).keys()];
+    var _fbSpecial = (M%2===1&&W%2===1) ? ((M%4===1&&W%4===3)?'XW':'XD') : null;
+    var _fbMc = new Array(M).fill(0), _fbFc = new Array(W).fill(0);
+    var _fbMatches = [];
+    var _fbUsedDB = {}, _fbUsedMX = {};
+    for (var _fbr = 0; _fbr < N; _fbr++) {
+      // Find which fixed matches go in this round
+      var _specM = [], _specW = [];
+      if (_fbPreAlloc[_fbr]) {
+        for (var _fpi = 0; _fpi < _fbPreAlloc[_fbr].length; _fpi++) {
+          var _fe = _fbPreAlloc[_fbr][_fpi];
+          if (_fe.type === 'MX') {
+            _specM.push(_fe.t1[0], _fe.t2[0]); _specW.push(_fe.t1[1], _fe.t2[1]);
+            _fbMatches.push([_fbr+1, 'MX', _fe.t1, _fe.t2, true]);
+            _fbMc[_fe.t1[0]]++; _fbMc[_fe.t2[0]]++; _fbFc[_fe.t1[1]]++; _fbFc[_fe.t2[1]]++;
+          } else if (_fe.type === 'DB') {
+            _specM.push(_fe.t1[0], _fe.t1[1], _fe.t2[0], _fe.t2[1]);
+            _fbMatches.push([_fbr+1, 'DB', _fe.t1, _fe.t2, true]);
+            for (var _dp of [..._fe.t1, ..._fe.t2]) _fbMc[_dp]++;
+          } else if (_fe.type === 'WB') {
+            _specW.push(_fe.t1[0], _fe.t1[1], _fe.t2[0], _fe.t2[1]);
+            _fbMatches.push([_fbr+1, 'WB', _fe.t1, _fe.t2, true]);
+            for (var _wp of [..._fe.t1, ..._fe.t2]) _fbFc[_wp]++;
+          }
+        }
+      }
+      // Shuffle for variety
+      function _fbS(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+      // Special court XW
+      if (_fbSpecial === 'XW') {
+        var _xwCand = _fbS(_allM.filter(function(p){return _specM.indexOf(p)<0 && _fbMc[p]<_fbr+1;}));
+        var _xwM = _xwCand[0];
+        if (_xwM !== undefined) {
+          var _xwCandW = _fbS(_allW.filter(function(p){return _specW.indexOf(p)<0 && _fbFc[p]<_fbr+1;}));
+          var _xwW = _xwCandW.slice(0,3);
+          if (_xwW.length >= 3) {
+            _specM.push(_xwM); _specW.push(_xwW[0], _xwW[1], _xwW[2]);
+            _fbMatches.push([_fbr+1, 'XW', [_xwM, _xwW[0]], [_xwW[1], _xwW[2]]]);
+            _fbMc[_xwM]++; _fbFc[_xwW[0]]++; _fbFc[_xwW[1]]++; _fbFc[_xwW[2]]++;
+          }
+        }
+      }
+      // Remaining men go to DB, women go to WB, pair leftovers for MX
+      var _avM = _fbS(_allM.filter(function(p){return _specM.indexOf(p)<0 && _fbMc[p]<_fbr+1;}));
+      var _avW = _fbS(_allW.filter(function(p){return _specW.indexOf(p)<0 && _fbFc[p]<_fbr+1;}));
+      // Determine mode & minimum requirements
+      var _fbMode = typeof getMode === 'function' ? getMode() : 'default';
+      var _needDBtotal = minDB || 0, _needWBtotal = minWB || 0, _needMXtotal = minMX || 0;
+      var _haveDBsoFar = 0, _haveWBsoFar = 0, _haveMXsoFar = 0;
+      for (var _fbc of _fbMatches) { if (_fbc[1]==='DB') _haveDBsoFar++; else if (_fbc[1]==='WB') _haveWBsoFar++; else if (_fbc[1]==='MX') _haveMXsoFar++; }
+      var _needDB = _needDBtotal > _haveDBsoFar ? Math.min(4, Math.max(4, _avM.length)) : 0;
+      var _needWB = _needWBtotal > _haveWBsoFar ? Math.min(4, Math.max(4, _avW.length)) : 0;
+      // DB: use as many full DB courts as possible (4 men each), respect mixed mode
+      if (_fbMode === 'mixed' || (_needMXtotal > _haveMXsoFar)) {
+        // Mixed priority: leave more men for MX
+        while (_avM.length >= 4 && _avW.length < 4) {
+          var _dbP = _avM.slice(0, 4); _avM = _avM.slice(4);
+          _fbMatches.push([_fbr+1, 'DB', [_dbP[0],_dbP[1]], [_dbP[2],_dbP[3]]]);
+          for (var _dp of _dbP) _fbMc[_dp]++;
+        }
+      } else {
+        while (_avM.length >= 4) {
+          var _dbP = _avM.slice(0, 4); _avM = _avM.slice(4);
+          _fbMatches.push([_fbr+1, 'DB', [_dbP[0],_dbP[1]], [_dbP[2],_dbP[3]]]);
+          for (var _dp of _dbP) _fbMc[_dp]++;
+        }
+      }
+      // MX (prefer MX before WB to maximize mixed courts)
+      while (_avM.length >= 2 && _avW.length >= 2) {
+        var _m1 = _avM.shift(), _m2 = _avM.shift();
+        var _w1 = _avW.shift(), _w2 = _avW.shift();
+        _fbMatches.push([_fbr+1, 'MX', [_m1,_w1], [_m2,_w2]]);
+        _fbMc[_m1]++; _fbMc[_m2]++; _fbFc[_w1]++; _fbFc[_w2]++;
+      }
+      // WB: use remaining women
+      while (_avW.length >= 4) {
+        var _wbP = _avW.slice(0, 4); _avW = _avW.slice(4);
+        _fbMatches.push([_fbr+1, 'WB', [_wbP[0],_wbP[1]], [_wbP[2],_wbP[3]]]);
+        for (var _wp of _wbP) _fbFc[_wp]++;
+      }
+    }
+    if (_fbMc.every(function(v){return v===N;}) && _fbFc.every(function(v){return v===N;})) {
+      return { matches: _fbMatches, suggestion: suggestion, exact: exactMatch };
     }
   }
   return null;
@@ -1715,14 +2077,9 @@ function verifyConstraints(matches, M, W, constraints, relax) {
 
         if (!typeMatch) continue;
 
-        // Check if the match has the right players
-        function hasAll(team, players) {
-          return players.every(p => team.includes(p));
-        }
-
         const team1 = [a, b], team2 = [cc, d];
-        if ((hasAll(t1, team1) && hasAll(t2, team2)) ||
-            (hasAll(t1, team2) && hasAll(t2, team1))) {
+        if ((team1.every(p => t1.includes(p)) && team2.every(p => t2.includes(p))) ||
+            (team1.every(p => t2.includes(p)) && team2.every(p => t1.includes(p)))) {
           found = true; break;
         }
       }
@@ -1831,15 +2188,7 @@ document.getElementById('constraint-toggle').addEventListener('change', function
   document.getElementById('constraint-body').style.display = this.checked ? 'block' : 'none';
 });
 
-// Tab switching
-document.querySelectorAll('.constraint-tab').forEach(tab => {
-  tab.addEventListener('click', function() {
-    document.querySelectorAll('.constraint-tab').forEach(t => t.classList.remove('active'));
-    this.classList.add('active');
-    document.querySelectorAll('.constraint-panel').forEach(p => p.classList.remove('show'));
-    document.getElementById('panel-' + this.dataset.panel).classList.add('show');
-  });
-});
+// Tab switching (removed - both panels always visible)
 
 function getPlayerOptions(includeEmpty) {
   return players.map((p, i) => {
@@ -1878,6 +2227,7 @@ function renderPairConList() {
     const genderLabel = c.sameGender ? (c.gender === 'M' ? '男' : '女') : '混';
     const tagClass = c.sameGender ? (c.gender === 'M' ? 'blue' : 'pink') : 'orange';
     const tagText = c.sameGender ? (c.gender === 'M' ? '男双' : '女双') : '混双';
+    const roundsLabel = c.rounds > 0 ? ' <span class="con-label" style="color:var(--orange);">×' + c.rounds + '场</span>' : '';
     const row = document.createElement('div');
     row.className = 'con-row';
     row.innerHTML = `
@@ -1885,6 +2235,7 @@ function renderPairConList() {
       <strong>${p1Name}</strong>
       <span class="con-label">${relLabel}</span>
       <strong>${p2Name}</strong>
+      ${roundsLabel}
       <button class="btn btn-sm btn-danger" data-i="${i}" style="margin-left:auto;">✕</button>
     `;
     row.querySelector('.btn-danger').addEventListener('click', () => {
@@ -1903,6 +2254,7 @@ function renderFixedConList() {
     const bName = nameOf(c.b.g, c.b.i);
     const cName = nameOf(c.c.g, c.c.i);
     const dName = nameOf(c.d.g, c.d.i);
+    const roundsLabel = c.rounds > 0 ? ' <span class="con-label" style="color:var(--orange);">×' + c.rounds + '场</span>' : '';
     const row = document.createElement('div');
     row.className = 'con-row';
     row.innerHTML = `
@@ -1910,6 +2262,7 @@ function renderFixedConList() {
       <strong>${aName}</strong><span class="con-label">+</span><strong>${bName}</strong>
       <span class="con-label">vs</span>
       <strong>${cName}</strong><span class="con-label">+</span><strong>${dName}</strong>
+      ${roundsLabel}
       <button class="btn btn-sm btn-danger" data-i="${i}" style="margin-left:auto;">✕</button>
     `;
     row.querySelector('.btn-danger').addEventListener('click', () => {
@@ -1957,18 +2310,22 @@ document.getElementById('add-pair-con').addEventListener('click', () => {
     if (idx1 === -1) { idx1 = mn.indexOf(players[p2]); idx2 = wn.indexOf(players[p1]); }
   }
 
+  const rounds = parseInt(document.getElementById('pair-rounds').value) || 1;
+
   pairConstraints.push({
     type: 'pair',
     p1: idx1,
     p2: idx2,
     rel: rel,
     sameGender: sameGender,
-    gender: sameGender ? genderCode : 'M'  // male index by default for mixed
+    gender: sameGender ? genderCode : 'M',  // male index by default for mixed
+    rounds: rounds
   });
 
   renderPairConList();
   document.getElementById('pair-p1').value = '';
   document.getElementById('pair-p2').value = '';
+  document.getElementById('pair-rounds').value = '1';
   hideError();
 });
 
@@ -2018,10 +2375,13 @@ document.getElementById('add-fixed-con').addEventListener('click', () => {
     return;
   }
 
+  const rounds = parseInt(document.getElementById('fixed-rounds').value) || 1;
+
   fixedConstraints.push({
     type: 'fixed',
     a: ga, b: gb, c: gc, d: gd,
-    genders: genders
+    genders: genders,
+    rounds: rounds
   });
 
   renderFixedConList();
@@ -2029,6 +2389,7 @@ document.getElementById('add-fixed-con').addEventListener('click', () => {
   document.getElementById('fixed-b').value = '';
   document.getElementById('fixed-c').value = '';
   document.getElementById('fixed-d').value = '';
+  document.getElementById('fixed-rounds').value = '1';
   hideError();
 });
 
@@ -2103,26 +2464,84 @@ function getOrderedRounds() {
   return Array.from(tabs).map(btn => parseInt(btn.dataset.round));
 }
 
+// ===== Conflict Detection =====
+function checkConflicts(pairCons, fixedCons) {
+  // 1. Same pair with conflicting relationships
+  for (var _ci = 0; _ci < pairCons.length; _ci++) {
+    for (var _cj = _ci + 1; _cj < pairCons.length; _cj++) {
+      var _a = pairCons[_ci], _b = pairCons[_cj];
+      if (_a.sameGender === _b.sameGender && _a.p1 === _b.p1 && _a.p2 === _b.p2) {
+        if (_a.rel !== _b.rel) {
+          var _gn = _a.sameGender ? _a.gender : 'M';
+          showError('冲突: ' + nameOf(_gn, _a.p1) + ' 与 ' + nameOf(_gn === 'M' ? 'W' : 'M', _a.p2) + ' 同时指定了「组队」和「对手」');
+          return false;
+        }
+      }
+    }
+  }
+
+  // 2. Fixed matches: same player on different sides
+  for (var _ci = 0; _ci < fixedCons.length; _ci++) {
+    var _fa = fixedCons[_ci];
+    for (var _cj = _ci + 1; _cj < fixedCons.length; _cj++) {
+      var _fb = fixedCons[_cj];
+      // Compare by genders to handle M/W index collision
+      for (var _pi = 0; _pi < 4; _pi++) {
+        var _faKey = _fa.genders[_pi] + ':' + (_fa.genders[_pi]==='M' ? _fa.a : _fa.b); // simplified - just use position
+        // Actually, compare by positions that share the same gender
+        var _faVal = [_fa.a, _fa.b, _fa.c, _fa.d][_pi];
+        var _faGen = _fa.genders[_pi];
+        for (var _pj = 0; _pj < 4; _pj++) {
+          var _fbVal = [_fb.a, _fb.b, _fb.c, _fb.d][_pj];
+          var _fbGen = _fb.genders[_pj];
+          if (_faGen === _fbGen && _faVal === _fbVal) {
+            var _faSide = _pi < 2 ? 0 : 1;
+            var _fbSide = _pj < 2 ? 0 : 1;
+            if (_faSide !== _fbSide) {
+              showError('冲突: 同一个选手出现在两个四人指定的对战中');
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+// ===== Loading Overlay =====
+function showLoading() {
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+
 // ===== Generate =====
 
 document.getElementById('gen-btn').addEventListener('click', () => {
+  console.log('GENBTN: generating...');
   hideError();
+  showLoading();
+  // Defer heavy computation so the loading overlay renders first
+  setTimeout(function _doGen() {
   const mn = players.filter(p => p.gender === '男');
   const wn = players.filter(p => p.gender === '女');
   const M = mn.length, W = wn.length;
 
-  if (players.length === 0) { showError('请先添加选手!'); return; }
-  for (const p of players) { if (!p.name.trim()) { showError('请为所有选手填写姓名!'); return; } }
+  if (players.length === 0) { hideLoading(); showError('请先添加选手!'); return; }
+  for (const p of players) { if (!p.name.trim()) { hideLoading(); showError('请为所有选手填写姓名!'); return; } }
   // Odd-odd is now supported with special courts (MXxWB/MXxDB)
   if ((M % 2 === 1 && W % 2 === 0) || (M % 2 === 0 && W % 2 === 1)) {
-    showError('男女人数必须同为偶数或同为奇数(当前男' + M + '人,女' + W + '人)'); return;
+    hideLoading(); showError('男女人数必须同为偶数或同为奇数(当前男' + M + '人,女' + W + '人)'); return;
   }
-  if ((M + W) % 4 !== 0) { showError('总人数必须是4的倍数(当前共' + (M+W) + '人)'); return; }
+  if ((M + W) % 4 !== 0) { hideLoading(); showError('总人数必须是4的倍数(当前共' + (M+W) + '人)'); return; }
 
   maleNames = mn.map(p => p.name.trim());
   femaleNames = wn.map(p => p.name.trim());
 
-  const currentRounds = currentRoundCount || 5;
+  const currentRounds = currentRoundCount || 1;
 
   const constraintsEnabled = document.getElementById('constraint-toggle').checked;
   let constraints = [];
@@ -2134,12 +2553,17 @@ document.getElementById('gen-btn').addEventListener('click', () => {
   const minWB = getMinInput('min-wb');
   const minMX = getMinInput('min-mx');
 
+  // Conflict detection
+  if (constraintsEnabled && constraints.length > 0) {
+    if (!checkConflicts(pairConstraints, fixedConstraints)) { hideLoading(); return; }
+  }
+
   // Try strict first, then progressively relax
   var genResult = null, relaxLevel = 0;
   var relaxTries = [
-    {relax: 0, tries: 2000},
-    {relax: 1, tries: 3000},
-    {relax: 2, tries: 5000}
+    {relax: 0, tries: 200},
+    {relax: 1, tries: 300},
+    {relax: 2, tries: 500}
   ];
   
   for (var ri = 0; ri < relaxTries.length; ri++) {
@@ -2151,6 +2575,7 @@ document.getElementById('gen-btn').addEventListener('click', () => {
   }
 
   if (!genResult) {
+    hideLoading();
     if (constraints.length > 0) {
       showError('无法在满足指定约束的条件下生成排阵,请检查约束是否与人数组合冲突,或减少指定条件');
     } else {
@@ -2159,6 +2584,7 @@ document.getElementById('gen-btn').addEventListener('click', () => {
     return;
   }
 
+  hideLoading();
   const result = genResult.matches;
   const exactMatch = genResult.exact;
   const suggestion = genResult.suggestion;
@@ -2177,6 +2603,7 @@ document.getElementById('gen-btn').addEventListener('click', () => {
   lastGenState = buildGenState(M, W, result, currentRounds);
 
   showResult(result, M, W, relaxLevel, constraints, currentRounds, !exactMatch, suggestion);
+  });
 });
 
 function buildGenState(M, W, matches, rounds) {
@@ -2300,7 +2727,7 @@ function renderAllRounds(matches, N) {
     header.appendChild(dragLabel);
 
     // Delete button
-    if (N > 5) {
+    if (N > 1) {
       const delBtn = document.createElement('span');
       delBtn.textContent = ' ×';
       delBtn.style.cssText = 'cursor:pointer;font-size:16px;color:var(--red);font-weight:bold;margin-left:6px;';
@@ -2435,6 +2862,40 @@ function deleteRound(r, matches, N) {
   if (lastGenState) {
     lastGenState.matches = newMatches;
     lastGenState.rounds = newN;
+    // Rebuild used sets from remaining matches
+    lastGenState.usedDB = new Set();
+    lastGenState.usedWB = new Set();
+    lastGenState.usedMX = new Set();
+    lastGenState.mc = new Array(lastGenState.M).fill(0);
+    lastGenState.fc = new Array(lastGenState.W).fill(0);
+    for (var _rm of newMatches) {
+      var _rt = _rm[1], _r1 = _rm[2], _r2 = _rm[3];
+      if (_rt === 'DB') {
+        lastGenState.usedDB.add(Math.min(..._r1)+','+Math.max(..._r1));
+        lastGenState.usedDB.add(Math.min(..._r2)+','+Math.max(..._r2));
+        for (var _rp of [..._r1, ..._r2]) lastGenState.mc[_rp]++;
+      } else if (_rt === 'WB') {
+        lastGenState.usedWB.add(Math.min(..._r1)+','+Math.max(..._r1));
+        lastGenState.usedWB.add(Math.min(..._r2)+','+Math.max(..._r2));
+        for (var _rp of [..._r1, ..._r2]) lastGenState.fc[_rp]++;
+      } else if (_rt === 'MX') {
+        lastGenState.usedMX.add(_r1[0]+','+_r1[1]);
+        lastGenState.usedMX.add(_r2[0]+','+_r2[1]);
+        lastGenState.mc[_r1[0]]++; lastGenState.mc[_r2[0]]++;
+        lastGenState.fc[_r1[1]]++; lastGenState.fc[_r2[1]]++;
+      } else if (_rt === 'XW') {
+        lastGenState.mc[_r1[0]]++; lastGenState.fc[_r1[1]]++;
+        lastGenState.fc[_r2[0]]++; lastGenState.fc[_r2[1]]++;
+      } else if (_rt === 'XD') {
+        lastGenState.mc[_r1[0]]++; lastGenState.mc[_r2[0]]++;
+        lastGenState.mc[_r2[1]]++; lastGenState.fc[_r1[1]]++;
+      } else if (_rt === 'MB') {
+        for (var _rp of [..._r1]) lastGenState.mc[_rp]++;
+        for (var _rp of [..._r2]) lastGenState.fc[_rp]++;
+        lastGenState.usedDB.add(Math.min(..._r1)+','+Math.max(..._r1));
+        lastGenState.usedWB.add(Math.min(..._r2)+','+Math.max(..._r2));
+      }
+    }
   }
 
   hideError();
@@ -2607,11 +3068,14 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 
 document.getElementById('add-round-btn')?.addEventListener('click', function() {
   if (!lastGenState) { showError('请先生成排阵'); return; }
+  showLoading();
+  // Defer heavy computation so the loading overlay renders first
+  setTimeout(function _doAddRound() {
 
   const { M, W, matches: existing, usedDB, usedWB, usedMX, mc, fc, rounds } = lastGenState;
   const newRoundIdx = rounds;
 
-  if (newRoundIdx >= MAX_ROUNDS) { showError('已达最大轮次上限 ' + MAX_ROUNDS); return; }
+  if (newRoundIdx >= MAX_ROUNDS) { hideLoading(); showError('已达最大轮次上限 ' + MAX_ROUNDS); return; }
 
   // Compute distribution for new round
   const N = newRoundIdx + 1;
@@ -2622,7 +3086,7 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
   for (const m of existing) {
     if (m[1] === 'DB') dbSum++;
     else if (m[1] === 'WB') wbSum++;
-    else mxSum++;
+    else if (m[1] === 'MX') mxSum++;
   }
 
   // Find total distribution for N rounds
@@ -2630,17 +3094,20 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
   if (allDists.length === 0) { showError('无法为 ' + N + ' 轮找到可行分布'); return; }
 
   // Filter by mode
-  const sorted = sortDistsByMode(allDists, getMode());
+  const sorted = sortDistsByMode(allDists, getMode(), newRoundIdx + 1);
 
   let newRoundOK = false;
   let newMatchesForRound = null;
   let newState = null;
 
   for (const cand of sorted) {
-    const { a: tA, b: tB, c: tC } = cand;
+    const { a: tA, b: tB, c: tC, dist: candDist } = cand;
+    const candSpecial = candDist && candDist[0] ? candDist[0][3] : null;
+    const hasSpecial = candSpecial === 'XW' || candSpecial === 'XD';
     const aNew = tA - dbSum, bNew = tB - wbSum, cNew = tC - mxSum;
-
-    if (aNew < 0 || bNew < 0 || cNew < 0 || aNew + bNew + cNew !== cp) continue;
+    const stdCourts = aNew + bNew + cNew;
+    const specCount = hasSpecial ? 1 : 0;
+    if (aNew < 0 || bNew < 0 || cNew < 0 || stdCourts + specCount !== cp) continue;
 
     // Try to generate one round
     const needDB = 4 * aNew, needWB = 4 * bNew, needMX = 2 * cNew;
@@ -2656,15 +3123,38 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
     // Build allowed players (those who can play one more time)
     // Since each plays once per round, just use all players
 
+    // Special court allocation
+    let specM = [], specW = [];
+    if (candSpecial === 'XW') {
+      // Pick 1 man and 3 women for XW, prefer those with fewer total appearances
+      var _xwM = shuffle([...Array(M).keys()]).sort(function(a,b){ return newMc[a]-newMc[b]; });
+      var _xwW = shuffle([...Array(W).keys()]).sort(function(a,b){ return newFc[a]-newFc[b]; });
+      // Take the guy with fewest appearances, and 3 women
+      specM = [_xwM[0]]; specW = _xwW.slice(0,3);
+      for (var _s = 0; _s < specM.length; _s++) newMc[specM[_s]]++;
+      for (var _s = 0; _s < specW.length; _s++) newFc[specW[_s]]++;
+      roundMatches.push([newRoundIdx + 1, 'XW', [specM[0], specW[0]], [specW[1], specW[2]]]);
+    } else if (candSpecial === 'XD') {
+      var _xdM = shuffle([...Array(M).keys()]).sort(function(a,b){ return newMc[a]-newMc[b]; });
+      var _xdW = shuffle([...Array(W).keys()]).sort(function(a,b){ return newFc[a]-newFc[b]; });
+      specM = _xdM.slice(0,3); specW = [_xdW[0]];
+      for (var _s = 0; _s < specM.length; _s++) newMc[specM[_s]]++;
+      for (var _s = 0; _s < specW.length; _s++) newFc[specW[_s]]++;
+      roundMatches.push([newRoundIdx + 1, 'XD', [specM[0], specW[0]], [specM[1], specM[2]]]);
+    }
+
+    var _availM = [...Array(M).keys()].filter(function(p){ return specM.indexOf(p) < 0; });
+    var _availW = [...Array(W).keys()].filter(function(p){ return specW.indexOf(p) < 0; });
+
     // DB
     let mxMlist = [];
     if (needDB > 0) {
-      const dbCandidates = [...Array(M).keys()];
+      const dbCandidates = _availM;
       // Pick needDB players: prefer those who played fewer DB
       const dbPicks = shuffle(dbCandidates.filter(p => true)).sort((a,b) => newMc[a] - newMc[b]).slice(0, needDB);
       const chosenSet = new Set(dbPicks);
 
-      const pairResult = flexPair(dbPicks, usedDB, 500);
+      const pairResult = flexPair(dbPicks, new Set(), 200);
       if (!pairResult) { ok = false; continue; }
 
       for (const [t1, t2] of pairResult) {
@@ -2682,11 +3172,11 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
     // WB
     let mxFlist = [];
     if (needWB > 0) {
-      const wbCandidates = [...Array(W).keys()];
+      const wbCandidates = _availW;
       const wbPicks = shuffle(wbCandidates.filter(p => true)).sort((a,b) => newFc[a] - newFc[b]).slice(0, needWB);
       const chosenSet = new Set(wbPicks);
 
-      const pairResult = flexPair(wbPicks, usedWB, 500);
+      const pairResult = flexPair(wbPicks, new Set(), 200);
       if (!pairResult) { ok = false; continue; }
 
       for (const [t1, t2] of pairResult) {
@@ -2696,27 +3186,30 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
         roundMatches.push([newRoundIdx + 1, 'WB', t1, t2]);
         for (const p of [...t1, ...t2]) newFc[p]++;
       }
-      mxFlist = wbCandidates.filter(p => !chosenSet.has(p));
+      mxFlist = _availW.filter(p => !chosenSet.has(p));
     } else {
-      mxFlist = [...Array(W).keys()];
+      mxFlist = [..._availW];
     }
 
     // MX
-    if (needMX > 0) {
-      const mixResult = flexMix(mxMlist, mxFlist, usedMX, 500);
-      if (!mixResult) { ok = false; continue; }
-
-      // But wait, needMX = 2*cNew means we need cNew MX matches
-      if (mixResult.length < cNew) { ok = false; continue; }
-
-      for (let i = 0; i < cNew; i++) {
-        const [t1, t2] = mixResult[i];
+    if (needMX > 0 && mxMlist.length >= 2 && mxFlist.length >= 2 && mxMlist.length === mxFlist.length) {
+      var _mm = shuffle([...mxMlist]);
+      var _ff = shuffle([...mxFlist]);
+      var _mxPairs = [];
+      for (var _pi = 0; _pi < _mm.length && _mxPairs.length < cNew; _pi += 2) {
+        _mxPairs.push([[_mm[_pi], _ff[_pi]], [_mm[_pi+1], _ff[_pi+1]]]);
+      }
+      if (_mxPairs.length < cNew) { ok = false; continue; }
+      for (var _i2 = 0; _i2 < cNew; _i2++) {
+        const [t1, t2] = _mxPairs[_i2];
         usedMX.add(t1[0]+','+t1[1]);
         usedMX.add(t2[0]+','+t2[1]);
         roundMatches.push([newRoundIdx + 1, 'MX', t1, t2]);
         newMc[t1[0]]++; newMc[t2[0]]++;
         newFc[t1[1]]++; newFc[t2[1]]++;
       }
+    } else if (needMX > 0) {
+      ok = false; continue;
     }
 
     if (ok) {
@@ -2728,6 +3221,7 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
   }
 
   if (!newRoundOK) {
+    hideLoading();
     showError('无法为第 ' + (newRoundIdx + 1) + ' 轮生成有效排阵,需要放宽搭档限制或调整人数');
     return;
   }
@@ -2742,7 +3236,9 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
   document.getElementById('success-msg').textContent = '✅ 已添加第 ' + N + ' 轮!';
   document.getElementById('success-msg').classList.add('show');
 
+  hideLoading();
   showResult(allMatches, M, W, 0, null, N, false, null);
+  });
 });
 
 // ==================== Export Excel ====================
@@ -3099,6 +3595,20 @@ if (dateInput && !dateInput.value) {
   dateInput.value = fmtDate(new Date());
 }
 </script>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-box">
+    <span class="icon">🎾</span>
+    <div class="loading-spinner"></div>
+    <div class="title">正在计算排阵中</div>
+    <div class="sub">
+      算法正在努力安排最佳对阵<span class="dot-1">.</span><span class="dot-2">.</span><span class="dot-3">.</span><br>
+      请耐心等待
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
 
