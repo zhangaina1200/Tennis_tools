@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -452,6 +452,29 @@
     margin-top: 1px;
   }
   .mode-btn.active .mode-sub { color: rgba(255,255,255,0.75); }
+
+  .gen-m { color: #1565c0; font-weight:600; }
+  .gen-f { color: #e91e63; font-weight:600; }
+  .partner-stat-card { padding:10px 14px; background:var(--green-pale); border-radius:6px; border-left:3px solid var(--green); margin-bottom:6px; }
+  .partner-stat-card .name { font-weight:600; color:var(--green-dark); }
+  .partner-stat-card .detail { font-size:13px; color:#555; margin-top:3px; }
+  .partner-stat-card .detail .tag { display:inline-block; background:#fff; padding:1px 8px; margin:1px 3px; border-radius:3px; font-size:12px; white-space:nowrap; }
+  .partner-stat-card .detail .tag.team { border-left:3px solid var(--green); }
+  .partner-stat-card .detail .tag.opp { border-left:3px solid var(--orange); }
+  .partner-no-repeats { padding:20px; text-align:center; color:var(--gray); font-size:14px; }
+
+  /* Highlight for player selection */
+  .match-row.highlight { background-color: #fff3cd !important; outline: 2px solid #ffc107; }
+  .match-row.highlight td { background-color: #fff3cd; }
+  .partner-stat-card .name { cursor: pointer; transition: background 0.2s, box-shadow 0.2s; border-radius: 6px; padding: 6px 10px; display: inline-block; }
+  .partner-stat-card .name:hover { background: #e8f5e9; }
+  .partner-stat-card .name.active { background: #fff3cd; box-shadow: 0 0 0 2px #ffc107; }
+
+  .btn-save { background: var(--blue); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: opacity 0.2s; }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-load { background: #7b1fa2; color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: opacity 0.2s; }
+  .btn-load:hover { opacity: 0.85; }
+
 </style>
 </head>
 <body>
@@ -532,6 +555,8 @@
     <div class="btn-group">
       <button class="btn btn-add" id="add-btn">+ 添加选手</button>
       <button class="btn btn-generate" id="gen-btn">🎾 生成排阵</button>
+      <button class="btn-save" id="save-btn" onclick="saveToLocal()">💾 保存</button>
+      <button class="btn-load" id="load-btn" onclick="loadFromLocal()">📂 加载</button>
     </div>
   </div>
 
@@ -611,6 +636,12 @@
 
   <div class="error-msg" id="error-msg"></div>
   <div class="success-msg" id="success-msg"></div>
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-box">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">正在计算…</div>
+    </div>
+  </div>
 
   <!-- Result Section -->
   <div id="result">
@@ -633,7 +664,7 @@
 
     <div class="card">
       <h2>🤝 搭档统计</h2>
-      <div class="stats-grid" id="stats-grid"></div>
+      <div class="stats-grid" id="partner-stats"></div>
     </div>
 
     <div class="card">
@@ -790,11 +821,10 @@ function sortDistsByMode(candidates, mode, N) {
     return result;
   }
   if (mode === 'doubles') {
-    const valid = candidates.filter(c => c.c >= 1);
-    valid.sort((x, y) => (y.a + y.b) - (x.a + x.b) || x.c - y.c);
-    const rest = candidates.filter(c => c.c < 1);
-    rest.sort((x, y) => (y.a + y.b) - (x.a + x.b));
-    return [...valid, ...rest];
+    // All candidates: fewer mixed courts first (c ascending), then by DB+WB descending
+    const sorted = [...candidates];
+    sorted.sort((x, y) => x.c - y.c || (y.a + y.b) - (x.a + x.b));
+    return sorted;
   }
   if (mode === 'mixed') {
     const valid = candidates.filter(c => c.a >= 1 && c.b >= 1);
@@ -1060,51 +1090,37 @@ function flexMix(males, females, used, maxT, forcedPairs, maleLevels, femaleLeve
 }
 
 function checkPairs(matches) {
-  const dbUsed = new Set(), wbUsed = new Set(), mxUsed = new Set();
-  const xwMxCount = {}, xwWbCount = {}, xdMxCount = {}, xdDbCount = {}, mxMxCount = {};
-  const MAX_SPECIAL_REPEAT = 5;
+  const pairCount = {}; // UNIVERSAL counter: any two players as teammates at most once
+  function checkPair(k) {
+    pairCount[k] = (pairCount[k] || 0) + 1;
+    if (pairCount[k] > 1) return false;
+    return true;
+  }
+  function setKey(a, b) { return Math.min(a,b) + ',' + Math.max(a,b); }
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') {
-      const k1 = Math.min(...t1)+','+Math.max(...t1);
-      const k2 = Math.min(...t2)+','+Math.max(...t2);
-      if (dbUsed.has(k1) || dbUsed.has(k2)) return false;
-      dbUsed.add(k1); dbUsed.add(k2);
+      if (!checkPair(setKey(t1[0], t1[1]))) return false;
+      if (!checkPair(setKey(t2[0], t2[1]))) return false;
     } else if (type === 'WB') {
-      const k1 = Math.min(...t1)+','+Math.max(...t1);
-      const k2 = Math.min(...t2)+','+Math.max(...t2);
-      if (wbUsed.has(k1) || wbUsed.has(k2)) return false;
-      wbUsed.add(k1); wbUsed.add(k2);
+      if (!checkPair(setKey(t1[0], t1[1]))) return false;
+      if (!checkPair(setKey(t2[0], t2[1]))) return false;
     } else if (type === 'MX') {
-      var _k1 = t1[0]+','+t1[1];
-      var _k2 = t2[0]+','+t2[1];
-      mxMxCount[_k1] = (mxMxCount[_k1]||0)+1;
-      mxMxCount[_k2] = (mxMxCount[_k2]||0)+1;
-      if (mxMxCount[_k1] > MAX_SPECIAL_REPEAT || mxMxCount[_k2] > MAX_SPECIAL_REPEAT) return false;
+      if (!checkPair(t1[0] + ',M' + t1[1])) return false; // male+ female pair
+      if (!checkPair(t2[0] + ',M' + t2[1])) return false;
     } else if (type === 'XW') {
-      xwMxCount[t1[0]+','+t1[1]] = (xwMxCount[t1[0]+','+t1[1]] || 0) + 1;
-      if (xwMxCount[t1[0]+','+t1[1]] > MAX_SPECIAL_REPEAT) return false;
-      const wbKey = Math.min(...t2)+','+Math.max(...t2);
-      xwWbCount[wbKey] = (xwWbCount[wbKey] || 0) + 1;
-      if (xwWbCount[wbKey] > MAX_SPECIAL_REPEAT) return false;
+      if (!checkPair(t1[0] + ',M' + t1[1])) return false;
+      if (!checkPair(setKey(t2[0], t2[1]))) return false;
     } else if (type === 'XD') {
-      xdMxCount[t1[0]+','+t1[1]] = (xdMxCount[t1[0]+','+t1[1]] || 0) + 1;
-      if (xdMxCount[t1[0]+','+t1[1]] > MAX_SPECIAL_REPEAT) return false;
-      const dbKey = Math.min(...t2)+','+Math.max(...t2);
-      xdDbCount[dbKey] = (xdDbCount[dbKey] || 0) + 1;
-      if (xdDbCount[dbKey] > MAX_SPECIAL_REPEAT) return false;
+      if (!checkPair(t1[0] + ',M' + t1[1])) return false;
+      if (!checkPair(setKey(t2[0], t2[1]))) return false;
     } else if (type === 'MB') {
-      const k1 = Math.min(...t1)+','+Math.max(...t1);
-      const k2 = Math.min(...t2)+','+Math.max(...t2);
-      if (dbUsed.has(k1) || wbUsed.has(k2)) return false;
-      dbUsed.add(k1); wbUsed.add(k2);
+      if (!checkPair(setKey(t1[0], t1[1]))) return false;
+      if (!checkPair(setKey(t2[0], t2[1]))) return false;
     }
   }
   return true;
-}
-
-/** Count pair occurrence across all matches (for constraint checking) */
-function countPairOccurrences(matches, type, p1, p2) {
+}function countPairOccurrences(matches, type, p1, p2) {
   let count = 0;
   for (const m of matches) {
     const [r, mt, t1, t2] = m;
@@ -1384,7 +1400,10 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
     // --- DB (rest of the original DB code, but using availM instead of all M) ---
     let mxM;
     if (needDB > 0) {
-      let cand = [...availM].sort((p1, p2) => { const l1 = dbLeft[p1] > 0 ? dbLeft[p1] + 100 : 0; const l2 = dbLeft[p2] > 0 ? dbLeft[p2] + 100 : 0; return l2 - l1; });
+      let cand = [...availM];
+      // Shuffle then sort by dbLeft descending (randomizes same-score groups)
+      for (var _csi = cand.length - 1; _csi > 0; _csi--) { var _csj = Math.floor(Math.random() * (_csi + 1)); var _cst = cand[_csi]; cand[_csi] = cand[_csj]; cand[_csj] = _cst; }
+      cand.sort(function(a,b){ return (dbLeft[b]>0?dbLeft[b]+100:0) - (dbLeft[a]>0?dbLeft[a]+100:0); });
       if (cand.length < needDB) return null;
       let chosen = new Set(cand.slice(0, needDB));
       // Ensure fixed match men are NOT in DB (they need to go to MX)
@@ -1459,7 +1478,12 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         const rrRound = rrDB[rrIdx];
         const validPairs = rrRound.filter(p => p.every(pi => availM.includes(pi)));
         if (validPairs.length >= 2) {
-          const pp = shuffle([...validPairs]);
+          // MRV: sort pairs by how few partner options these players have left
+          const pp = [...validPairs].sort(function(a, b) {
+            var aOpt = a.reduce(function(s, pi) { return s + dbLeft[pi]; }, 0);
+            var bOpt = b.reduce(function(s, pi) { return s + dbLeft[pi]; }, 0);
+            return aOpt - bOpt; // most constrained first
+          });
           for (let k = 0; k < pp.length; k += 2) {
             const [t1, t2] = [pp[k], pp[k + 1]];
             usedDB.add(Math.min(...t1)+','+Math.max(...t1));
@@ -1586,6 +1610,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         const rrRound = rrWB[rrIdx];
         const validPairs = rrRound.filter(p => p.every(pi => availW.includes(pi)));
         if (validPairs.length >= 2) {
+          // MRV: sort pairs by how few partner options these players have left
           const pp = shuffle([...validPairs]);
           for (let k = 0; k < pp.length; k += 2) {
             const [t1, t2] = [pp[k], pp[k + 1]];
@@ -1837,6 +1862,602 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
   if (!checkPairs(matches)) return null;
   return matches;
 }
+
+// ==================== Deterministic Algorithm (Plan A) ====================
+
+/**
+ * enumeratePairings - Evaluate all 3 pairings of 4 players, pick best by score
+ * Score = |level_diff| + match_balance + usedPairINF + oppRepeat
+ */
+function enumeratePairings(players, levels, usedPairs, oppCounters, gender) {
+  const INF = 1e9;
+  const g = gender || 'M';
+  const a = players[0], b = players[1], c = players[2], d = players[3];
+  
+  function scorePairing(p1, p2) {
+    const k1 = g + Math.min(p1[0],p1[1])+','+g + Math.max(p1[0],p1[1]);
+    const k2 = g + Math.min(p2[0],p2[1])+','+g + Math.max(p2[0],p2[1]);
+    let s = 0;
+    s += Math.abs((levels[p1[0]]||3.0) - (levels[p1[1]]||3.0));
+    s += Math.abs((levels[p2[0]]||3.0) - (levels[p2[1]]||3.0));
+    const sum1 = (levels[p1[0]]||3.0) + (levels[p1[1]]||3.0);
+    const sum2 = (levels[p2[0]]||3.0) + (levels[p2[1]]||3.0);
+    s += Math.abs(sum1 - sum2) * 10;
+    // Partner repeat: strictly prevent, no exceptions
+    if (usedPairs && usedPairs.has(k1)) return INF;
+    if (usedPairs && usedPairs.has(k2)) return INF;
+    if (oppCounters) {
+      const cross = [
+        g + Math.min(p1[0],p2[0]) + ',' + g + Math.max(p1[0],p2[0]),
+        g + Math.min(p1[0],p2[1]) + ',' + g + Math.max(p1[0],p2[1]),
+        g + Math.min(p1[1],p2[0]) + ',' + g + Math.max(p1[1],p2[0]),
+        g + Math.min(p1[1],p2[1]) + ',' + g + Math.max(p1[1],p2[1])
+      ];
+      for (let oi = 0; oi < cross.length; oi++) {
+        const cnt = oppCounters[cross[oi]] || 0;
+        if (cnt >= 1) s += 5000;
+        if (cnt >= 2) s += 50000;
+        if (cnt >= 3) return INF;
+      }
+    }
+    return s;
+  }
+  
+  const scores = [
+    { pairs: [[a,b],[c,d]], score: scorePairing([a,b],[c,d]) },
+    { pairs: [[a,c],[b,d]], score: scorePairing([a,c],[b,d]) },
+    { pairs: [[a,d],[b,c]], score: scorePairing([a,d],[b,c]) }
+  ];
+  
+  let best = null;
+  for (let i = 0; i < 3; i++) {
+    if (!best || scores[i].score < best.score) best = scores[i];
+  }
+  return best;
+}
+
+/**
+ * hungarian - Standard Hungarian algorithm for minimum weight perfect matching
+ * Input: n x n cost matrix  Output: assignment array [col_for_row0, col_for_row1, ...]
+ */
+function hungarian(costMatrix) {
+  const n = costMatrix.length;
+  if (n === 0) return [];
+  const u = new Array(n+1).fill(0);
+  const v = new Array(n+1).fill(0);
+  const p = new Array(n+1).fill(0);
+  const way = new Array(n+1).fill(0);
+  
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = new Array(n+1).fill(Infinity);
+    const used = new Array(n+1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0];
+      let delta = Infinity, j1 = 0;
+      for (let j = 1; j <= n; j++) {
+        if (!used[j]) {
+          const cur = costMatrix[i0-1][j-1] - u[i0] - v[j];
+          if (cur < minv[j]) { minv[j] = cur; way[j] = j0; }
+          if (minv[j] < delta) { delta = minv[j]; j1 = j; }
+        }
+      }
+      for (let j = 0; j <= n; j++) {
+        if (used[j]) { u[p[j]] += delta; v[j] -= delta; }
+        else { minv[j] -= delta; }
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0];
+      p[j0] = p[j1];
+      j0 = j1;
+    } while (j0 !== 0);
+  }
+  const assignment = new Array(n);
+  for (let j = 1; j <= n; j++) assignment[p[j]-1] = j-1;
+  return assignment;
+}
+
+/**
+ * buildCostMatrix - Build MX pairing cost matrix
+ * cost = |level_diff| + pairRepeatINF + oppPenalty
+ */
+function buildCostMatrix(men, women, usedMXPairs, maleLevels, femaleLevels, oppCounters, roundMen) {
+  const m = men.length, w = women.length, INF = 1e9;
+  const matrix = [];
+  for (let mi = 0; mi < m; mi++) {
+    matrix[mi] = [];
+    const manIdx = men[mi];
+    for (let wi = 0; wi < w; wi++) {
+      const womanIdx = women[wi];
+      let cost = Math.abs((maleLevels[manIdx]||3.0) - (femaleLevels[womanIdx]||3.0));
+      const pairKey = manIdx + ',M' + womanIdx;
+      if (usedMXPairs && usedMXPairs.has(pairKey)) cost += INF;
+      if (oppCounters && roundMen) {
+        // Check opponent repeats: men vs men and women vs women across MX courts
+        for (var _opi = 0; _opi < roundMen.length; _opi++) {
+          var _o = roundMen[_opi];
+          if (_o === manIdx) continue;
+          var _ok = 'M' + Math.min(manIdx, _o) + ',M' + Math.max(manIdx, _o);
+          var cnt = oppCounters[_ok] || 0;
+          if (cnt >= 2) cost += INF;
+          if (cnt >= 1) cost += 5000;
+        }
+      }
+      matrix[mi][wi] = cost;
+    }
+  }
+  return matrix;
+}
+
+/**
+ * allocatePlayers - Plan B Step 2 unified grouping engine.
+ * Assigns available players to DB/WB/MX groups based on partner diversity.
+ * Returns [groupDB, groupWB, groupMXMen, groupMXWomen] or null.
+ */
+function allocatePlayers(availM, availW, needDB, needWB, needMX, maleLevels, femaleLevels, usedPairs, oppCounters) {
+  var groupDB = [], groupMXMen = [];
+  var groupWB = [], groupMXWomen = [];
+  
+  if (needDB > 0) {
+    // Score men by unused partner count (higher = more flexible for that type)
+    var mScores = [];
+    for (var pi = 0; pi < availM.length; pi++) {
+      var p = availM[pi];
+      var unused = 0;
+      for (var pj = 0; pj < availM.length; pj++) {
+        if (pj === pi) continue;
+        var pk = 'M' + Math.min(p, availM[pj]) + ',M' + Math.max(p, availM[pj]);
+        if (!usedPairs.has(pk)) unused++;
+      }
+      mScores.push({unused: unused, p: p});
+    }
+    mScores.sort(function(a,b) { return b.unused - a.unused; });
+    groupDB = mScores.slice(0, needDB).map(function(x) { return x.p; });
+    groupMXMen = mScores.slice(needDB).map(function(x) { return x.p; }).slice(0, needMX);
+  } else {
+    groupMXMen = availM.slice(0, needMX);
+  }
+  
+  if (needWB > 0) {
+    var wScores = [];
+    for (var pi = 0; pi < availW.length; pi++) {
+      var p = availW[pi];
+      var unused = 0;
+      for (var pj = 0; pj < availW.length; pj++) {
+        if (pj === pi) continue;
+        var pk = 'W' + Math.min(p, availW[pj]) + ',W' + Math.max(p, availW[pj]);
+        if (!usedPairs.has(pk)) unused++;
+      }
+      wScores.push({unused: unused, p: p});
+    }
+    wScores.sort(function(a,b) { return b.unused - a.unused; });
+    groupWB = wScores.slice(0, needWB).map(function(x) { return x.p; });
+    groupMXWomen = wScores.slice(needWB).map(function(x) { return x.p; }).slice(0, needMX);
+  } else {
+    groupMXWomen = availW.slice(0, needMX);
+  }
+  
+  // Validate
+  if (groupDB.length !== needDB || groupWB.length !== needWB) return null;
+  if (groupMXMen.length !== needMX || groupMXWomen.length !== needMX) return null;
+  if (groupMXMen.length !== groupMXWomen.length) return null;
+  if (groupDB.length % 4 !== 0 || groupWB.length % 4 !== 0) return null;
+  
+  return [groupDB, groupWB, groupMXMen, groupMXWomen];
+}
+
+/**
+ * go_exact - Deterministic replacement for _go()
+ * DB/WB: enumeratePairings picks best
+ * MX: Hungarian algorithm for optimal pairing
+ * Plan B Step 1+2: oppCounters in MX, unified group allocation
+ */
+function go_exact(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, N, maleLevels, femaleLevels, roundCounters, oppCounters) {
+  oppCounters = oppCounters || {};
+  roundCounters = roundCounters || {};
+  const matches = [];
+  const usedPairs = new Set();
+  const usedMXPairs = new Set();
+  const usedSMX = new Set(), usedSWB = new Set(), usedSDB = new Set();
+  
+  function markPair(a, b, g) {
+    usedPairs.add(g + Math.min(a,b) + ',' + g + Math.max(a,b));
+  }
+  function addOpp(a, b, g) {
+    const key = g + Math.min(a,b) + ',' + g + Math.max(a,b);
+    oppCounters[key] = (oppCounters[key] || 0) + 1;
+  }
+
+  // Helper: pick special court MXxWB (1M+3W) with NTRP level awareness
+  function pickXW(rnd) {
+    const menOrder = [...Array(M).keys()], womenOrder = [...Array(W).keys()];
+    function xwScore(mIdx, wMx, wb0, wb1) {
+      const t1 = (maleLevels[mIdx]||3.0) + (femaleLevels[wMx]||3.0);
+      const t2 = (femaleLevels[wb0]||3.0) + (femaleLevels[wb1]||3.0);
+      return Math.abs(t1 - t2);
+    }
+    let best = null, bestScore = Infinity, bestRepeat = null, bestRepeatScore = Infinity;
+    const startM = rnd % M, startW_base = rnd % W;
+    for (let mi = 0; mi < M; mi++) {
+      const mIdx = menOrder[(startM + mi) % M];
+      const startW = (startW_base + mi) % W;
+      for (let wi = 0; wi < W; wi++) {
+        const wMx = womenOrder[(startW + wi) % W];
+        const mxKey = mIdx + ',' + wMx;
+        const restW = womenOrder.filter(w => w !== wMx);
+        for (let wbi = 0; wbi < restW.length - 1; wbi++)
+          for (let wbj = wbi + 1; wbj < restW.length; wbj++) {
+            const wbKey = Math.min(restW[wbi], restW[wbj]) + ',' + Math.max(restW[wbi], restW[wbj]);
+            const sc = xwScore(mIdx, wMx, restW[wbi], restW[wbj]);
+            if (!usedSMX.has(mxKey) && !usedSWB.has(wbKey)) {
+              if (sc < bestScore) { bestScore = sc; best = [mIdx, wMx, restW[wbi], restW[wbj], sc]; }
+            } else {
+              if (sc < bestRepeatScore) { bestRepeatScore = sc; bestRepeat = [mIdx, wMx, restW[wbi], restW[wbj], sc]; }
+            }
+          }
+      }
+    }
+    return (best || bestRepeat || null);
+  }
+
+  // Helper: pick special court MXxDB (3M+1W)
+  function pickXD(rnd) {
+    const menOrder = [...Array(M).keys()], womenOrder = [...Array(W).keys()];
+    function xdScore(mMx, wIdx, db0, db1) {
+      const t1 = (maleLevels[mMx]||3.0) + (femaleLevels[wIdx]||3.0);
+      const t2 = (maleLevels[db0]||3.0) + (maleLevels[db1]||3.0);
+      return Math.abs(t1 - t2);
+    }
+    let best = null, bestScore = Infinity, bestRepeat = null, bestRepeatScore = Infinity;
+    const startW = rnd % W, startM_base = rnd % M;
+    for (let wi = 0; wi < W; wi++) {
+      const wIdx = womenOrder[(startW + wi) % W];
+      const startM = (startM_base + wi) % M;
+      for (let mi = 0; mi < M; mi++) {
+        const mMx = menOrder[(startM + mi) % M];
+        const mxKey = mMx + ',' + wIdx;
+        const restM = menOrder.filter(m => m !== mMx);
+        for (let dbi = 0; dbi < restM.length - 1; dbi++)
+          for (let dbj = dbi + 1; dbj < restM.length; dbj++) {
+            const dbKey = Math.min(restM[dbi], restM[dbj]) + ',' + Math.max(restM[dbi], restM[dbj]);
+            const sc = xdScore(mMx, wIdx, restM[dbi], restM[dbj]);
+            if (!usedSMX.has(mxKey) && !usedSDB.has(dbKey)) {
+              if (sc < bestScore) { bestScore = sc; best = [mMx, wIdx, restM[dbi], restM[dbj], sc]; }
+            } else {
+              if (sc < bestRepeatScore) { bestRepeatScore = sc; bestRepeat = [mMx, wIdx, restM[dbi], restM[dbj], sc]; }
+            }
+          }
+      }
+    }
+    return (best || bestRepeat || null);
+  }
+  
+  for (let r = 0; r < N; r++) {
+    const d = dist[r];
+    const a = d[0], b = d[1], c = d[2], special = d[3];
+    let needDB = 4 * a, needWB = 4 * b, needMX = 2 * c;
+    
+    // Compute who still needs to play this round
+    const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
+    for (let mi = 0; mi < matches.length; mi++) {
+      const m = matches[mi];
+      const type = m[1], t1 = m[2], t2 = m[3];
+      if (type === 'DB') { mc[t1[0]]++; mc[t1[1]]++; mc[t2[0]]++; mc[t2[1]]++; }
+      else if (type === 'WB') { fc[t1[0]]++; fc[t1[1]]++; fc[t2[0]]++; fc[t2[1]]++; }
+      else if (type === 'MX') { mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++; }
+      else if (type === 'XW') { mc[t1[0]]++; fc[t1[1]]++; fc[t2[0]]++; fc[t2[1]]++; }
+      else if (type === 'XD') { mc[t1[0]]++; mc[t2[0]]++; mc[t2[1]]++; fc[t1[1]]++; }
+    }
+
+    const specM = [], specW = [];
+
+    // --- Special court placement (XW/XD) ---
+    if (special === 'XW') {
+      const p = pickXW(r);
+      if (!p) return null;
+      const [sm, swMx, swb0, swb1] = p;
+      specM.push(sm); specW.push(swMx, swb0, swb1);
+      usedSMX.add(sm + ',' + swMx);
+      usedSWB.add(Math.min(swb0, swb1) + ',' + Math.max(swb0, swb1));
+      matches.push([r + 1, 'XW', [sm, swMx], [swb0, swb1]]);
+      // Record opponent relationships: MX woman vs each WB woman
+      addOpp(swMx, swb0, 'W');
+      addOpp(swMx, swb1, 'W');
+    } else if (special === 'XD') {
+      const p = pickXD(r);
+      if (!p) return null;
+      const [smMx, sw, sdb0, sdb1] = p;
+      specM.push(smMx, sdb0, sdb1); specW.push(sw);
+      usedSMX.add(smMx + ',' + sw);
+      usedSDB.add(Math.min(sdb0, sdb1) + ',' + Math.max(sdb0, sdb1));
+      matches.push([r + 1, 'XD', [smMx, sw], [sdb0, sdb1]]);
+      // Record opponent relationships: MX man vs each DB man
+      addOpp(smMx, sdb0, 'M');
+      addOpp(smMx, sdb1, 'M');
+    }
+
+    // --- roundCounters: place N-round fixed constraints ---
+    if (roundCounters) {
+      const rcKeys = Object.keys(roundCounters);
+      for (let rci = 0; rci < rcKeys.length; rci++) {
+        const rck = rcKeys[rci];
+        const rc = roundCounters[rck];
+        if (!rc || rc.remaining <= 0) continue;
+        const fc = rc.constraint;
+        const isDB = fc.genders === 'MMMM';
+        const isWB = fc.genders === 'WWWW';
+        const isMX = fc.genders === 'MWMW' || fc.genders === 'WMWM' || fc.genders === 'MWWM' || fc.genders === 'WMMW';
+        const isXW = fc.genders === 'MWWW' || fc.genders === 'WMWW' || fc.genders === 'WWMW';
+        const isXD = fc.genders === 'MMMW' || fc.genders === 'MWMM' || fc.genders === 'MMWM';
+        // XW/XD already handled by special court above
+        if (isXW || isXD) continue;
+        const need = isDB ? 4 : isWB ? 4 : 2;
+        let hasCapacity = false;
+        if (isDB && needDB >= need) hasCapacity = true;
+        else if (isWB && needWB >= need) hasCapacity = true;
+        else if (isMX && needMX >= need) hasCapacity = true;
+        if (!hasCapacity) continue;
+        if (isDB) {
+          needDB -= 4; specM.push(fc.a, fc.b, fc.c, fc.d);
+          matches.push([r+1, 'DB', [fc.a, fc.b], [fc.c, fc.d], true]);
+        } else if (isWB) {
+          needWB -= 4; specW.push(fc.a, fc.b, fc.c, fc.d);
+          matches.push([r+1, 'WB', [fc.a, fc.b], [fc.c, fc.d], true]);
+        } else if (isMX) {
+          needMX -= 2;
+          const m1 = fc.genders[0] === 'M' ? fc.a : fc.b;
+          const w1 = fc.genders[0] === 'M' ? fc.b : fc.a;
+          const m2 = fc.genders[2] === 'M' ? fc.c : fc.d;
+          const w2 = fc.genders[2] === 'M' ? fc.d : fc.c;
+          specM.push(m1, m2); specW.push(w1, w2);
+          matches.push([r+1, 'MX', [m1, w1], [m2, w2], true]);
+        }
+        rc.remaining--;
+        break;
+      }
+    }
+
+    let availM = [];
+    for (let mi = 0; mi < M; mi++) if (mc[mi] === r && !specM.includes(mi)) availM.push(mi);
+    let availW = [];
+    for (let wi = 0; wi < W; wi++) if (fc[wi] === r && !specW.includes(wi)) availW.push(wi);
+    
+    // Sort by level for deterministic order
+    // --- Plan B Step 2: Unified grouping ---
+    var groupDB, groupWB, groupMXMen, groupMXWomen;
+    if (needDB > 0 || needWB > 0 || needMX > 0) {
+      var alloc = allocatePlayers(availM, availW, needDB, needWB, needMX, maleLevels, femaleLevels, usedPairs, oppCounters);
+      if (!alloc) return null;
+      groupDB = alloc[0]; groupWB = alloc[1]; groupMXMen = alloc[2]; groupMXWomen = alloc[3];
+    } else {
+      groupDB = []; groupWB = []; groupMXMen = []; groupMXWomen = [];
+    }
+    
+    // --- DB ---
+    if (needDB > 0) {
+      var dbPlayers = groupDB;
+      // For large DB groups (8+ players), use global pairing to maximize diversity
+      if (dbPlayers.length >= 8) {
+        // Global pairing: treat all players as one pool, minimize opponent repeats
+        // Build 4-player groups greedily: assign players to minimize intra-group opponent history
+        var _numGrps = dbPlayers.length / 4;
+        var _grps = [];
+        for (var _gi = 0; _gi < _numGrps; _gi++) _grps.push([]);
+        
+        // Sort players by total opponent count with all others (most constrained first)
+        dbPlayers.sort(function(a, b) {
+          var cntA = 0, cntB = 0;
+          for (var _pi = 0; _pi < dbPlayers.length; _pi++) {
+            if (dbPlayers[_pi] === a || dbPlayers[_pi] === b) continue;
+            var _ok = 'M' + Math.min(a, dbPlayers[_pi]) + ',M' + Math.max(a, dbPlayers[_pi]);
+            cntA += oppCounters[_ok] || 0;
+            var _ok2 = 'M' + Math.min(b, dbPlayers[_pi]) + ',M' + Math.max(b, dbPlayers[_pi]);
+            cntB += oppCounters[_ok2] || 0;
+          }
+          return cntB - cntA;
+        });
+        
+        // Greedy assignment with quadratic penalty: assign each player to the group where they have least total opponent history
+        for (var _pi = 0; _pi < dbPlayers.length; _pi++) {
+          var _p = dbPlayers[_pi];
+          var _bestGrp = -1, _bestScore = Infinity;
+          for (var _gi = 0; _gi < _numGrps; _gi++) {
+            if (_grps[_gi].length >= 4) continue;
+            var _score = 0;
+            for (var _mj = 0; _mj < _grps[_gi].length; _mj++) {
+              var _ok = 'M' + Math.min(_p, _grps[_gi][_mj]) + ',M' + Math.max(_p, _grps[_gi][_mj]);
+              var cnt = oppCounters[_ok] || 0;
+              _score += cnt * (cnt + 1) * 5000; // quadratic penalty prevents repeat groupings
+            }
+            _score += (4 - _grps[_gi].length); // slight preference for smaller groups
+            if (_score < _bestScore) { _bestScore = _score; _bestGrp = _gi; }
+          }
+          _grps[_bestGrp].push(_p);
+        }
+        
+        // Flatten groups back
+        var _sortedPlayers = [];
+        for (var _gi3 = 0; _gi3 < _numGrps; _gi3++) _sortedPlayers = _sortedPlayers.concat(_grps[_gi3]);
+        dbPlayers = _sortedPlayers;
+      }
+      for (let di = 0; di < needDB; di += 4) {
+        const four = dbPlayers.slice(di, di+4);
+        const ep = enumeratePairings(four, maleLevels, usedPairs, oppCounters, 'M');
+        if (!ep) return null;
+        const p1 = ep.pairs[0], p2 = ep.pairs[1];
+        matches.push([r+1, 'DB', p1, p2]);
+        markPair(p1[0], p1[1], 'M'); markPair(p2[0], p2[1], 'M');
+        addOpp(p1[0], p2[0], 'M'); addOpp(p1[0], p2[1], 'M');
+        addOpp(p1[1], p2[0], 'M'); addOpp(p1[1], p2[1], 'M');
+      }
+    }
+    
+    // --- WB ---
+    if (needWB > 0) {
+      var wbPlayers = groupWB;
+      // For large WB groups (8+ players), use global pairing to maximize diversity
+      if (wbPlayers.length >= 8) {
+        var _numGrps = wbPlayers.length / 4;
+        var _grps = [];
+        for (var _gi = 0; _gi < _numGrps; _gi++) _grps.push([]);
+        
+        wbPlayers.sort(function(a, b) {
+          var cntA = 0, cntB = 0;
+          for (var _pi = 0; _pi < wbPlayers.length; _pi++) {
+            if (wbPlayers[_pi] === a || wbPlayers[_pi] === b) continue;
+            var _ok = 'W' + Math.min(a, wbPlayers[_pi]) + ',W' + Math.max(a, wbPlayers[_pi]);
+            cntA += oppCounters[_ok] || 0;
+            var _ok2 = 'W' + Math.min(b, wbPlayers[_pi]) + ',W' + Math.max(b, wbPlayers[_pi]);
+            cntB += oppCounters[_ok2] || 0;
+          }
+          return cntB - cntA;
+        });
+        
+        for (var _pi = 0; _pi < wbPlayers.length; _pi++) {
+          var _p = wbPlayers[_pi];
+          var _bestGrp = -1, _bestScore = Infinity;
+          for (var _gi = 0; _gi < _numGrps; _gi++) {
+            if (_grps[_gi].length >= 4) continue;
+            var _score = 0;
+            for (var _mj = 0; _mj < _grps[_gi].length; _mj++) {
+              var _ok = 'W' + Math.min(_p, _grps[_gi][_mj]) + ',W' + Math.max(_p, _grps[_gi][_mj]);
+              var cnt = oppCounters[_ok] || 0;
+              _score += cnt * (cnt + 1) * 5000;
+            }
+            _score += (4 - _grps[_gi].length);
+            if (_score < _bestScore) { _bestScore = _score; _bestGrp = _gi; }
+          }
+          _grps[_bestGrp].push(_p);
+        }
+        
+        var _sortedPlayers = [];
+        for (var _gi3 = 0; _gi3 < _numGrps; _gi3++) _sortedPlayers = _sortedPlayers.concat(_grps[_gi3]);
+        wbPlayers = _sortedPlayers;
+      }
+      for (let wi = 0; wi < needWB; wi += 4) {
+        const four = wbPlayers.slice(wi, wi+4);
+        const ep = enumeratePairings(four, femaleLevels, usedPairs, oppCounters, 'W');
+        if (!ep) return null;
+        const p1 = ep.pairs[0], p2 = ep.pairs[1];
+        matches.push([r+1, 'WB', p1, p2]);
+        markPair(p1[0], p1[1], 'W'); markPair(p2[0], p2[1], 'W');
+        addOpp(p1[0], p2[0], 'W'); addOpp(p1[0], p2[1], 'W');
+        addOpp(p1[1], p2[0], 'W'); addOpp(p1[1], p2[1], 'W');
+      }
+    }
+    
+    // --- MX ---
+    if (needMX > 0) {
+      var mxMen = groupMXMen;
+      var mxWomen = groupMXWomen;
+      if (mxMen.length !== mxWomen.length || mxMen.length === 0) return null;
+      const numCourts = c;
+      // Opponent-aware grouping for MX men: minimize having past opponents in same MX court
+      if (mxMen.length >= 4) {
+        var _mxG = Math.floor(mxMen.length / 2); // number of MX courts (men pairs)
+        var _mxGrps = [];
+        for (var _mgi = 0; _mgi < _mxG; _mgi++) _mxGrps.push([]);
+        mxMen.sort(function(a, b) {
+          var ca = 0, cb = 0;
+          for (var _pi = 0; _pi < mxMen.length; _pi++) {
+            if (mxMen[_pi] === a || mxMen[_pi] === b) continue;
+            ca += oppCounters['M'+Math.min(a,mxMen[_pi])+',M'+Math.max(a,mxMen[_pi])] || 0;
+            cb += oppCounters['M'+Math.min(b,mxMen[_pi])+',M'+Math.max(b,mxMen[_pi])] || 0;
+          }
+          return cb - ca;
+        });
+        for (var _pi = 0; _pi < mxMen.length; _pi++) {
+          var _p = mxMen[_pi];
+          var _bg = -1, _bs = Infinity;
+          for (var _gi = 0; _gi < _mxG; _gi++) {
+            if (_mxGrps[_gi].length >= 2) continue;
+            var _sc = 0;
+            for (var _mj = 0; _mj < _mxGrps[_gi].length; _mj++) {
+              var _ok = 'M' + Math.min(_p, _mxGrps[_gi][_mj]) + ',M' + Math.max(_p, _mxGrps[_gi][_mj]);
+              var cnt = oppCounters[_ok] || 0;
+              _sc += cnt * (cnt + 1) * 5000;
+            }
+            _sc += (2 - _mxGrps[_gi].length);
+            if (_sc < _bs) { _bs = _sc; _bg = _gi; }
+          }
+          _mxGrps[_bg].push(_p);
+        }
+        var _mxSorted = [];
+        for (var _gi3 = 0; _gi3 < _mxG; _gi3++) _mxSorted = _mxSorted.concat(_mxGrps[_gi3]);
+        mxMen = _mxSorted;
+      }
+      const matrix = buildCostMatrix(mxMen, mxWomen, usedMXPairs, maleLevels, femaleLevels, oppCounters, mxMen);
+      if (matrix.length === 0 || matrix[0].length !== matrix.length) return null;
+      // Check if any cost is INF (all options blocked)
+      var _allInf = true;
+      for (var _mi = 0; _mi < matrix.length && _allInf; _mi++) {
+        for (var _mj = 0; _mj < matrix[_mi].length && _allInf; _mj++) {
+          if (matrix[_mi][_mj] < 1e8) _allInf = false;
+        }
+      }
+      if (_allInf) return null;
+      // Fast path: when cost matrix is all zeros (equal levels), pair by order
+      var assign;
+      var _isAllZero = true;
+      for (var _zmi = 0; _zmi < matrix.length && _isAllZero; _zmi++) {
+        for (var _zmj = 0; _zmj < matrix[_zmi].length && _isAllZero; _zmj++) {
+          if (matrix[_zmi][_zmj] !== 0) _isAllZero = false;
+        }
+      }
+      if (_isAllZero) {
+        assign = [];
+        for (var _zi = 0; _zi < mxMen.length; _zi++) assign.push(_zi);
+        // Rotate by round number to avoid repeating same opponent pairs
+        var _shift = r % mxMen.length;
+        if (_shift > 0) {
+          assign = assign.slice(_shift).concat(assign.slice(0, _shift));
+        }
+      } else {
+        assign = hungarian(matrix);
+      }
+      // Check opponent limits before committing
+      let mxOppsTooMany = false;
+      for (let ci = 0; ci < numCourts && !mxOppsTooMany; ci++) {
+        const wi1 = assign[2*ci], wi2 = assign[2*ci+1];
+        const m1 = mxMen[2*ci], m2 = mxMen[2*ci+1];
+        const w1 = mxWomen[wi1], w2 = mxWomen[wi2];
+        const mKey = 'M' + Math.min(m1,m2) + ',M' + Math.max(m1,m2);
+        const wKey = 'W' + Math.min(w1,w2) + ',W' + Math.max(w1,w2);
+        if ((oppCounters[mKey]||0) >= 3 || (oppCounters[wKey]||0) >= 3) mxOppsTooMany = true;
+      }
+      if (mxOppsTooMany) return null;
+      for (let ci = 0; ci < numCourts; ci++) {
+        const wi1 = assign[2*ci], wi2 = assign[2*ci+1];
+        const t1 = [mxMen[2*ci], mxWomen[wi1]];
+        const t2 = [mxMen[2*ci+1], mxWomen[wi2]];
+        matches.push([r+1, 'MX', t1, t2]);
+        usedMXPairs.add(t1[0]+',M'+t1[1]);
+        usedMXPairs.add(t2[0]+',M'+t2[1]);
+        oppCounters['M' + Math.min(t1[0],t2[0]) + ',M' + Math.max(t1[0],t2[0])] = (oppCounters['M' + Math.min(t1[0],t2[0]) + ',M' + Math.max(t1[0],t2[0])]||0)+1;
+        oppCounters['W' + Math.min(t1[1],t2[1]) + ',W' + Math.max(t1[1],t2[1])] = (oppCounters['W' + Math.min(t1[1],t2[1]) + ',W' + Math.max(t1[1],t2[1])]||0)+1;
+      }
+    }
+  }
+  
+  // Verify match counts
+  const fmc = new Array(M).fill(0), ffc = new Array(W).fill(0);
+  for (let mi = 0; mi < matches.length; mi++) {
+    const m = matches[mi];
+    const type = m[1], t1 = m[2], t2 = m[3];
+    if (type === 'DB' || type === 'MB') { for (const p of t1) fmc[p]++; for (const p of t2) fmc[p]++; }
+    else if (type === 'WB') { for (const p of t1) ffc[p]++; for (const p of t2) ffc[p]++; }
+    else if (type === 'MX') { fmc[t1[0]]++; fmc[t2[0]]++; ffc[t1[1]]++; ffc[t2[1]]++; }
+    else if (type === 'XW') { fmc[t1[0]]++; ffc[t1[1]]++; ffc[t2[0]]++; ffc[t2[1]]++; }
+    else if (type === 'XD') { fmc[t1[0]]++; fmc[t2[0]]++; fmc[t2[1]]++; ffc[t1[1]]++; }
+  }
+  if (!fmc.every(function(v){return v===N;}) || !ffc.every(function(v){return v===N;})) return null;
+  return matches;
+}
+
 function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
   tries = tries || 3000;
   relax = relax || 0;
@@ -1852,6 +2473,7 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
   // If no constraints, default mode, preset exists, and no min requirements
   if ((!constraints || constraints.length === 0) && mode === 'default' && PRESETS[key] && N === 5 && minDB === 0 && minWB === 0 && minMX === 0) {
     const preset = PRESETS[key].map(m => [...m]);
+    if (!checkPairs(preset)) return null;
     return { matches: preset, suggestion: null, exact: true };
   }
   const allDists = getAllDists(M, W, N);
@@ -1890,30 +2512,43 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
     }
   }
 
-  for (var ci = 0; ci < sorted.length; ci++) {
-    var cand = sorted[ci];
-    var isUniform = cand.uniform;
-    var dist = cand.dist;
-    for (var i = 0; i < tries; i++) {
-      try {
-        console.log('generate: trying _go candidate ci='+ci+' i='+i);
-        var r = _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, maleLevels, femaleLevels);
-        if (r) {
-          var ok = verifyConstraints(r, M, W, constraints, relax);
-          if (i === 0) console.log('_go OK on try 0, verifyConstraints=' + ok);
-          if (ok) { console.log('SUCCESS after ' + i + ' tries'); return { matches: r, suggestion: suggestion, exact: exactMatch }; }
-        } else {
-          if (i === 0) console.log('_go null on first try');
-        }
-      } catch(e) {
-        console.error('_go error:', e.message);
-      }
-      // Early exit: if first 50 tries all null, reduce tries
-      if (i >= 100 && i % 100 === 0) console.log('Tried ' + i + ' times, still no result...');
+  // --- Round Counters for multi-round fixed constraints ---
+  var roundCounters = {};
+  for (var rci = 0; rci < fixedCons.length; rci++) {
+    var rc = fixedCons[rci];
+    if (rc.rounds > 1) {
+      var rcKey = rc.genders + '|' + rc.a + ',' + rc.b + ',' + rc.c + ',' + rc.d;
+      roundCounters[rcKey] = {
+        remaining: Math.min(rc.rounds, N),
+        constraint: rc,
+        total: Math.min(rc.rounds, N)
+      };
     }
   }
-  // Brute-force fallback: force uniform distribution and place pre-allocated matches
-  console.log('FALLBACK: checking, fixedCons='+fixedCons.length+' constraints='+constraints.length);
+  var _rcOriginal = {};
+  for (var rck in roundCounters) { _rcOriginal[rck] = { remaining: roundCounters[rck].remaining, constraint: roundCounters[rck].constraint, total: roundCounters[rck].total }; }
+    for (var ci = 0; ci < sorted.length; ci++) {
+    var cand = sorted[ci];
+    var oppCounters = {};
+    var rcCopy = {};
+    for (var rck in _rcOriginal) { rcCopy[rck] = { remaining: _rcOriginal[rck].remaining, constraint: _rcOriginal[rck].constraint, total: _rcOriginal[rck].total }; }
+    roundCounters = rcCopy;
+    var isUniform = cand.uniform;
+    var dist = cand.dist;
+    try {
+      var r = go_exact(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, N, maleLevels, femaleLevels, roundCounters, oppCounters);
+      if (r) {
+        var ok = verifyConstraints(r, M, W, constraints, relax);
+        if (ok) {
+          if (typeof PRESETS !== 'undefined' && key && !PRESETS[key]) try { PRESETS[key] = r.map(function(m){return [...m];}); } catch(e) {}
+          return { matches: r, suggestion: suggestion, exact: exactMatch };
+        }
+      }
+    } catch(e) {
+      console.error('go_exact error:', e.message);
+    }
+  }// Brute-force fallback: force uniform distribution and place pre-allocated matches
+  console.log('FALLBACK: checking, fixedCons='+fixedCons.length+' constraints='+(constraints?constraints.length:0));
   var _fbPreAlloc = {};
   for (var _fbi = 0; _fbi < fixedCons.length; _fbi++) {
     var _fbc = fixedCons[_fbi];
@@ -1928,92 +2563,210 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
       }
     }
   }
-  if (Object.keys(_fbPreAlloc).length > 0) {
-    var _allM = [...Array(M).keys()], _allW = [...Array(W).keys()];
-    var _fbSpecial = (M%2===1&&W%2===1) ? ((M%4===1&&W%4===3)?'XW':'XD') : null;
-    var _fbMc = new Array(M).fill(0), _fbFc = new Array(W).fill(0);
-    var _fbMatches = [];
-    var _fbUsedDB = {}, _fbUsedMX = {};
-    for (var _fbr = 0; _fbr < N; _fbr++) {
-      // Find which fixed matches go in this round
-      var _specM = [], _specW = [];
-      if (_fbPreAlloc[_fbr]) {
-        for (var _fpi = 0; _fpi < _fbPreAlloc[_fbr].length; _fpi++) {
-          var _fe = _fbPreAlloc[_fbr][_fpi];
-          if (_fe.type === 'MX') {
-            _specM.push(_fe.t1[0], _fe.t2[0]); _specW.push(_fe.t1[1], _fe.t2[1]);
-            _fbMatches.push([_fbr+1, 'MX', _fe.t1, _fe.t2, true]);
-            _fbMc[_fe.t1[0]]++; _fbMc[_fe.t2[0]]++; _fbFc[_fe.t1[1]]++; _fbFc[_fe.t2[1]]++;
-          } else if (_fe.type === 'DB') {
-            _specM.push(_fe.t1[0], _fe.t1[1], _fe.t2[0], _fe.t2[1]);
-            _fbMatches.push([_fbr+1, 'DB', _fe.t1, _fe.t2, true]);
-            for (var _dp of [..._fe.t1, ..._fe.t2]) _fbMc[_dp]++;
-          } else if (_fe.type === 'WB') {
-            _specW.push(_fe.t1[0], _fe.t1[1], _fe.t2[0], _fe.t2[1]);
-            _fbMatches.push([_fbr+1, 'WB', _fe.t1, _fe.t2, true]);
-            for (var _wp of [..._fe.t1, ..._fe.t2]) _fbFc[_wp]++;
-          }
-        }
-      }
-      // Shuffle for variety
-      function _fbS(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
-      // Special court XW
-      if (_fbSpecial === 'XW') {
-        var _xwCand = _fbS(_allM.filter(function(p){return _specM.indexOf(p)<0 && _fbMc[p]<_fbr+1;}));
-        var _xwM = _xwCand[0];
-        if (_xwM !== undefined) {
-          var _xwCandW = _fbS(_allW.filter(function(p){return _specW.indexOf(p)<0 && _fbFc[p]<_fbr+1;}));
-          var _xwW = _xwCandW.slice(0,3);
-          if (_xwW.length >= 3) {
-            _specM.push(_xwM); _specW.push(_xwW[0], _xwW[1], _xwW[2]);
-            _fbMatches.push([_fbr+1, 'XW', [_xwM, _xwW[0]], [_xwW[1], _xwW[2]]]);
-            _fbMc[_xwM]++; _fbFc[_xwW[0]]++; _fbFc[_xwW[1]]++; _fbFc[_xwW[2]]++;
-          }
-        }
-      }
-      // Remaining men go to DB, women go to WB, pair leftovers for MX
-      var _avM = _fbS(_allM.filter(function(p){return _specM.indexOf(p)<0 && _fbMc[p]<_fbr+1;}));
-      var _avW = _fbS(_allW.filter(function(p){return _specW.indexOf(p)<0 && _fbFc[p]<_fbr+1;}));
-      // Determine mode & minimum requirements
-      var _fbMode = typeof getMode === 'function' ? getMode() : 'default';
-      var _needDBtotal = minDB || 0, _needWBtotal = minWB || 0, _needMXtotal = minMX || 0;
-      var _haveDBsoFar = 0, _haveWBsoFar = 0, _haveMXsoFar = 0;
-      for (var _fbc of _fbMatches) { if (_fbc[1]==='DB') _haveDBsoFar++; else if (_fbc[1]==='WB') _haveWBsoFar++; else if (_fbc[1]==='MX') _haveMXsoFar++; }
-      var _needDB = _needDBtotal > _haveDBsoFar ? Math.min(4, Math.max(4, _avM.length)) : 0;
-      var _needWB = _needWBtotal > _haveWBsoFar ? Math.min(4, Math.max(4, _avW.length)) : 0;
-      // DB: use as many full DB courts as possible (4 men each), respect mixed mode
-      if (_fbMode === 'mixed' || (_needMXtotal > _haveMXsoFar)) {
-        // Mixed priority: leave more men for MX
-        while (_avM.length >= 4 && _avW.length < 4) {
-          var _dbP = _avM.slice(0, 4); _avM = _avM.slice(4);
-          _fbMatches.push([_fbr+1, 'DB', [_dbP[0],_dbP[1]], [_dbP[2],_dbP[3]]]);
-          for (var _dp of _dbP) _fbMc[_dp]++;
-        }
-      } else {
-        while (_avM.length >= 4) {
-          var _dbP = _avM.slice(0, 4); _avM = _avM.slice(4);
-          _fbMatches.push([_fbr+1, 'DB', [_dbP[0],_dbP[1]], [_dbP[2],_dbP[3]]]);
-          for (var _dp of _dbP) _fbMc[_dp]++;
-        }
-      }
-      // MX (prefer MX before WB to maximize mixed courts)
-      while (_avM.length >= 2 && _avW.length >= 2) {
-        var _m1 = _avM.shift(), _m2 = _avM.shift();
-        var _w1 = _avW.shift(), _w2 = _avW.shift();
-        _fbMatches.push([_fbr+1, 'MX', [_m1,_w1], [_m2,_w2]]);
-        _fbMc[_m1]++; _fbMc[_m2]++; _fbFc[_w1]++; _fbFc[_w2]++;
-      }
-      // WB: use remaining women
-      while (_avW.length >= 4) {
-        var _wbP = _avW.slice(0, 4); _avW = _avW.slice(4);
-        _fbMatches.push([_fbr+1, 'WB', [_wbP[0],_wbP[1]], [_wbP[2],_wbP[3]]]);
-        for (var _wp of _wbP) _fbFc[_wp]++;
-      }
+  // Always try fallback — use ALL filtered distributions (respects minDB/minWB/minMX)
+  function _fbS(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  
+  // Collect all dists to try: use sorted order (respects mode preference)
+  var _fbAllDists = sorted.length > 0 ? sorted : allDists;
+  if (_fbAllDists.length === 0) { console.log('Fallback: no dists to try'); return null; }
+  
+  // Pre-roll all rounds' dist per round for easier access
+  function _fbBuildDist(_cand) {
+    var _d = _cand.dist;
+    return _d; // already [a,b,c,special] per round
+  }
+  
+  var _fbAllM = [...Array(M).keys()], _fbAllW = [...Array(W).keys()];
+  
+  for (var _fbDi = 0; _fbDi < _fbAllDists.length; _fbDi++) {
+    var _fbCand = _fbAllDists[_fbDi];
+    var _fbDist = _fbCand.dist;
+    
+    // Compute total DB/MX/WB per round from this dist
+    var _fbRoundInfo = [];
+    for (var _fbri = 0; _fbri < N; _fbri++) {
+      var _d = _fbDist[_fbri];
+      _fbRoundInfo.push({
+        a: _d[0], b: _d[1], c: _d[2], special: _d[3],
+        needDB: 4*_d[0], needWB: 4*_d[1], needMX: 2*_d[2]
+      });
     }
-    if (_fbMc.every(function(v){return v===N;}) && _fbFc.every(function(v){return v===N;})) {
-      return { matches: _fbMatches, suggestion: suggestion, exact: exactMatch };
+    
+    for (var _fbTry = 0; _fbTry < 100; _fbTry++) {
+      var _fbMc = new Array(M).fill(0), _fbFc = new Array(W).fill(0);
+      var _fbMatches = [];
+      var _fbPairs = new Set();
+      var _fbOppCount = {};
+      function _fbAddOp(a,b) { var k = Math.min(a,b)+','+Math.max(a,b); _fbOppCount[k] = (_fbOppCount[k]||0)+1; return _fbOppCount[k] <= 3; }
+      var _fbBad = false;
+      
+      for (var _fbr = 0; _fbr < N && !_fbBad; _fbr++) {
+        var _ri = _fbRoundInfo[_fbr];
+        
+        // Available players this round (shuffle for variety)
+        var _avM = _fbS(_fbAllM.filter(function(p){return _fbMc[p] < _fbr+1;}));
+        var _avW = _fbS(_fbAllW.filter(function(p){return _fbFc[p] < _fbr+1;}));
+        
+        // --- Special court ---
+        if (_ri.special === 'XW') {
+          var _sm = _avM.shift();
+          var _sw = _avW.slice(0,3); _avW = _avW.slice(3);
+          _fbMatches.push([_fbr+1, 'XW', [_sm,_sw[0]], [_sw[1],_sw[2]]]);
+          _fbMc[_sm]++; _fbFc[_sw[0]]++; _fbFc[_sw[1]]++; _fbFc[_sw[2]]++;
+        } else if (_ri.special === 'XD') {
+          var _swx = _avW.shift();
+          var _smx = _avM.slice(0,3); _avM = _avM.slice(3);
+          _fbMatches.push([_fbr+1, 'XD', [_smx[0],_swx], [_smx[1],_smx[2]]]);
+          _fbMc[_smx[0]]++; _fbMc[_smx[1]]++; _fbMc[_smx[2]]++; _fbFc[_swx]++;
+        }
+        
+        // --- DB (handle all courts: needDB/4 groups of 4) ---
+        if (_ri.needDB > 0) {
+          var _dbM = _avM.splice(0,_ri.needDB);
+          var _dbOK = true;
+          // Process all 4-player groups
+          for (var _dbGrp = 0; _dbGrp < _dbM.length && _dbOK; _dbGrp += 4) {
+            var _dbFour = _dbM.slice(_dbGrp, _dbGrp+4);
+            var _courtOK = false;
+            for (var _dbS = 0; _dbS < 12 && !_courtOK; _dbS++) {
+              var _sdb = _fbS([..._dbFour]);
+              var _k1 = Math.min(_sdb[0],_sdb[1])+','+Math.max(_sdb[0],_sdb[1]);
+              var _k2 = Math.min(_sdb[2],_sdb[3])+','+Math.max(_sdb[2],_sdb[3]);
+              if (_fbPairs.has(_k1) || _fbPairs.has(_k2)) continue;
+              // Check opponent repeat
+              var _opts = ['M'+Math.min(_sdb[0],_sdb[2])+',M'+Math.max(_sdb[0],_sdb[2]),
+                           'M'+Math.min(_sdb[0],_sdb[3])+',M'+Math.max(_sdb[0],_sdb[3]),
+                           'M'+Math.min(_sdb[1],_sdb[2])+',M'+Math.max(_sdb[1],_sdb[2]),
+                           'M'+Math.min(_sdb[1],_sdb[3])+',M'+Math.max(_sdb[1],_sdb[3])];
+              var _oppBad = false;
+              for (var _oi=0;_oi<4&&!_oppBad;_oi++) { if ((_fbOppCount[_opts[_oi]]||0)>=2) _oppBad = true; }
+              if (_oppBad) continue;
+              _fbPairs.add(_k1); _fbPairs.add(_k2);
+              for (var _oi=0;_oi<4;_oi++) _fbOppCount[_opts[_oi]] = (_fbOppCount[_opts[_oi]]||0)+1;
+              _fbMatches.push([_fbr+1, 'DB', [_sdb[0],_sdb[1]], [_sdb[2],_sdb[3]]]);
+              for (var _dp of _sdb) _fbMc[_dp]++;
+              _courtOK = true;
+            }
+            if (!_courtOK) { _dbOK = false; }
+          }
+          if (!_dbOK) { _fbBad = true; break; }
+        }
+        
+        // --- WB (handle all courts: needWB/4 groups of 4) ---
+        if (_ri.needWB > 0) {
+          var _wbW = _avW.splice(0,_ri.needWB);
+          var _wbOK = true;
+          for (var _wbGrp = 0; _wbGrp < _wbW.length && _wbOK; _wbGrp += 4) {
+            var _wbFour = _wbW.slice(_wbGrp, _wbGrp+4);
+            var _courtOK = false;
+            for (var _wbS = 0; _wbS < 12 && !_courtOK; _wbS++) {
+              var _swb = _fbS([..._wbFour]);
+              var _k1 = Math.min(_swb[0],_swb[1])+','+Math.max(_swb[0],_swb[1]);
+              var _k2 = Math.min(_swb[2],_swb[3])+','+Math.max(_swb[2],_swb[3]);
+              if (_fbPairs.has(_k1) || _fbPairs.has(_k2)) continue;
+              // Check opponent repeat
+              var _opts = ['W'+Math.min(_swb[0],_swb[2])+',W'+Math.max(_swb[0],_swb[2]),
+                           'W'+Math.min(_swb[0],_swb[3])+',W'+Math.max(_swb[0],_swb[3]),
+                           'W'+Math.min(_swb[1],_swb[2])+',W'+Math.max(_swb[1],_swb[2]),
+                           'W'+Math.min(_swb[1],_swb[3])+',W'+Math.max(_swb[1],_swb[3])];
+              var _oppBad = false;
+              for (var _oi=0;_oi<4&&!_oppBad;_oi++) { if ((_fbOppCount[_opts[_oi]]||0)>=2) _oppBad = true; }
+              if (_oppBad) continue;
+              _fbPairs.add(_k1); _fbPairs.add(_k2);
+              for (var _oi=0;_oi<4;_oi++) _fbOppCount[_opts[_oi]] = (_fbOppCount[_opts[_oi]]||0)+1;
+              _fbMatches.push([_fbr+1, 'WB', [_swb[0],_swb[1]], [_swb[2],_swb[3]]]);
+              for (var _wp of _swb) _fbFc[_wp]++;
+              _courtOK = true;
+            }
+            if (!_courtOK) { _wbOK = false; }
+          }
+          if (!_wbOK) { _fbBad = true; break; }
+        }
+        
+        // --- MX ---
+        if (_ri.needMX > 0) {
+          var _mxM = _avM.slice(0,_ri.needMX); _avM = _avM.slice(_ri.needMX);
+          var _mxW = _avW.slice(0,_ri.needMX); _avW = _avW.slice(_ri.needMX);
+          var _mxOK = false;
+          for (var _mxS = 0; _mxS < 50 && !_mxOK; _mxS++) {
+            var _smxM = _fbS([..._mxM]);
+            var _smxW = _fbS([..._mxW]);
+            var _pp = [];
+            var _ppOK = true;
+            for (var _pi = 0; _pi < _smxM.length; _pi += 2) {
+              var _mk1 = _smxM[_pi]+',M'+_smxW[_pi];
+              var _mk2 = _smxM[_pi+1]+',M'+_smxW[_pi+1];
+              if (_fbPairs.has(_mk1) || _fbPairs.has(_mk2)) { _ppOK = false; break; }
+              // Check opponent limit
+              if (!_fbAddOp(_smxM[_pi],_smxM[_pi+1]) || !_fbAddOp(_smxW[_pi],_smxW[_pi+1])) { _ppOK = false; break; }
+              _pp.push([[_smxM[_pi],_smxW[_pi]], [_smxM[_pi+1],_smxW[_pi+1]]]);
+            }
+            if (!_ppOK || !_pp.length) continue;
+            for (var _pi = 0; _pi < _pp.length; _pi++) {
+              var t1 = _pp[_pi][0], t2 = _pp[_pi][1];
+              _fbPairs.add(t1[0]+',M'+t1[1]);
+              _fbPairs.add(t2[0]+',M'+t2[1]);
+              _fbMatches.push([_fbr+1, 'MX', t1, t2]);
+              _fbMc[t1[0]]++; _fbMc[t2[0]]++; _fbFc[t1[1]]++; _fbFc[t2[1]]++;
+            }
+            _mxOK = true;
+          }
+          if (!_mxOK) { _fbBad = true; break; }
+        }
+        
+        // Check all players used in this round
+        if (_fbMc.some(function(v,i){return v<_fbr+1;}) || _fbFc.some(function(v,i){return v<_fbr+1;})) { _fbBad = true; break; }
+      }
+      
+      if (!_fbBad && _fbMc.every(function(v){return v===N;}) && _fbFc.every(function(v){return v===N;})) {
+        return { matches: _fbMatches, suggestion: suggestion, exact: exactMatch };
+      }
     }
   }
+  console.log('Fallback: all dists failed, trying brute force...');
+  
+  // Pure brute-force: fill all rounds with all MX
+  for (var _fbBfTry = 0; _fbBfTry < 200; _fbBfTry++) {
+    var _bfMc = new Array(M).fill(0), _bfFc = new Array(W).fill(0);
+    var _bfMatches = [];
+    var _bfPairs = new Set();
+    var _bfBad = false;
+    for (var _bfr = 0; _bfr < N && !_bfBad; _bfr++) {
+      var _bavM = _fbS(_fbAllM.filter(function(p){return _bfMc[p] < _bfr+1;}));
+      var _bavW = _fbS(_fbAllW.filter(function(p){return _bfFc[p] < _bfr+1;}));
+      var _bfOK = false;
+      for (var _bfS = 0; _bfS < 100 && !_bfOK; _bfS++) {
+        var _bm = _fbS([..._bavM]), _bw = _fbS([..._bavW]);
+        var _bp = [];
+        var _bppOK = true;
+        for (var _bpi = 0; _bpi < _bm.length; _bpi += 2) {
+          var _bk = _bm[_bpi]+',M'+_bw[_bpi];
+          var _bk2 = _bm[_bpi+1]+',M'+_bw[_bpi+1];
+          if (_bfPairs.has(_bk) || _bfPairs.has(_bk2)) { _bppOK = false; break; }
+          _bp.push([[_bm[_bpi],_bw[_bpi]],[_bm[_bpi+1],_bw[_bpi+1]]]);
+        }
+        if (!_bppOK || !_bp.length) continue;
+        var _bpOK = true;
+        for (var _bpi = 0; _bpi < _bp.length && _bpOK; _bpi++) {
+          _bfPairs.add(_bp[_bpi][0][0]+',M'+_bp[_bpi][0][1]);
+          _bfPairs.add(_bp[_bpi][1][0]+',M'+_bp[_bpi][1][1]);
+          _bfMatches.push([_bfr+1, 'MX', _bp[_bpi][0], _bp[_bpi][1]]);
+          _bfMc[_bp[_bpi][0][0]]++; _bfMc[_bp[_bpi][1][0]]++;
+          _bfFc[_bp[_bpi][0][1]]++; _bfFc[_bp[_bpi][1][1]]++;
+        }
+        _bfOK = true;
+      }
+      if (!_bfOK) { _bfBad = true; break; }
+      var _bremM = _fbAllM.filter(function(p){return _bfMc[p] < _bfr+1;});
+      if (_bremM.length > 0) { _bfBad = true; break; }
+    }
+    if (!_bfBad && _bfMc.every(function(v){return v===N;}) && _bfFc.every(function(v){return v===N;})) {
+      console.log('Brute-force fallback success');
+      return { matches: _bfMatches, suggestion: suggestion, exact: exactMatch };
+    }
+  }
+  
+  console.log('Fallback: all attempts failed');
   return null;
 }
 
@@ -2099,17 +2852,50 @@ let currentRound = 0;
 let lastResult = null;
 let maleNames = [];
 let femaleNames = [];
+let maleLevels = [];
+let femaleLevels = [];
 let pairConstraints = [];
 let fixedConstraints = [];
 
 function nameOf(gender, idx) {
-  // Always read from the live players array
-  if (gender === 'M') {
-    const males = players.filter(p => p.gender === '\u7537');
-    return males[idx]?.name || ('M' + (idx + 1));
+  var arr = gender === 'M' ? (typeof maleNames !== 'undefined' && maleNames.length > idx ? maleNames : null) : (typeof femaleNames !== 'undefined' && femaleNames.length > idx ? femaleNames : null);
+  if (!arr) {
+    arr = gender === 'M' ? players.filter(function(p){return p.gender==='\u7537';}).map(function(p){return p.name||'';}) : players.filter(function(p){return p.gender==='\u5973';}).map(function(p){return p.name||'';});
   }
-  const females = players.filter(p => p.gender === '\u5973');
-  return females[idx]?.name || ('W' + (idx + 1));
+  return arr[idx] || (gender === 'M' ? 'M' + (idx + 1) : 'W' + (idx + 1));
+}
+
+function dispName(gender, idx, showLevel) {
+  var name = nameOf(gender, idx);
+  var icon = gender === 'M' ? '\u2642' : '\u2640';
+  var cls = gender === 'M' ? 'gen-m' : 'gen-f';
+  var level = '';
+  if (showLevel) {
+    var lv = 3.0;
+    if (gender === 'M' && typeof maleLevels !== 'undefined' && maleLevels[idx] !== undefined) {
+      lv = maleLevels[idx];
+    } else if (gender === 'W' && typeof femaleLevels !== 'undefined' && femaleLevels[idx] !== undefined) {
+      lv = femaleLevels[idx];
+    } else {
+      var arr = gender === 'M' ? players.filter(function(p){return p.gender==='\u7537';}) : players.filter(function(p){return p.gender==='\u5973';});
+      lv = (arr[idx] && arr[idx].level) || 3.0;
+    }
+    level = '<span style="color:var(--gray);font-size:12px;">(' + lv + ')</span>';
+  }
+  return '<span class=\"' + cls + '\">' + icon + ' ' + name + '</span>' + level;
+}
+
+function dispNamePlain(gender, idx) {
+  var name = nameOf(gender, idx);
+  var icon = gender === 'M' ? '\u2642' : '\u2640';
+  return icon + ' ' + name;
+}
+
+function dispPlayerOpt(playerIdx) {
+  var p = players[playerIdx];
+  if (!p) return '';
+  var icon = p.gender === '\u7537' ? '\u2642' : '\u2640';
+  return icon + ' ' + (p.name || '\u65E0\u540D');
 }
 
 function levelOf(gender, idx) {
@@ -2182,6 +2968,405 @@ function addPlayer(gender, name, level) {
 
 document.getElementById('add-btn').addEventListener('click', () => addPlayer());
 
+// ===== Loading Overlay =====
+function showLoading() {
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+
+// ===== Generate =====
+
+document.getElementById('gen-btn').addEventListener('click', () => {
+  console.log('GENBTN: generating...');
+  hideError();
+  showLoading();
+  // Defer heavy computation so the loading overlay renders first
+  setTimeout(function _doGen() {
+  const mn = players.filter(p => p.gender === '男');
+  const wn = players.filter(p => p.gender === '女');
+  const M = mn.length, W = wn.length;
+
+  if (players.length === 0) { hideLoading(); showError('请先添加选手!'); return; }
+  for (const p of players) { if (!p.name.trim()) { hideLoading(); showError('请为所有选手填写姓名!'); return; } }
+  // Odd-odd is now supported with special courts (MXxWB/MXxDB)
+  if ((M % 2 === 1 && W % 2 === 0) || (M % 2 === 0 && W % 2 === 1)) {
+    hideLoading(); showError('男女人数必须同为偶数或同为奇数(当前男' + M + '人,女' + W + '人)'); return;
+  }
+  if ((M + W) % 4 !== 0) { hideLoading(); showError('总人数必须是4的倍数(当前共' + (M+W) + '人)'); return; }
+
+  maleNames = mn.map(p => p.name.trim());
+  femaleNames = wn.map(p => p.name.trim());
+  maleLevels = mn.map(p => p.level || 3.0);
+  femaleLevels = wn.map(p => p.level || 3.0);
+
+  const currentRounds = currentRoundCount || 1;
+
+  const constraintsEnabled = document.getElementById('constraint-toggle').checked;
+  let constraints = [];
+  if (constraintsEnabled) {
+    constraints = [...pairConstraints, ...fixedConstraints];
+  }
+
+  const minDB = getMinInput('min-db');
+  const minWB = getMinInput('min-wb');
+  const minMX = getMinInput('min-mx');
+
+  // Conflict detection
+  if (constraintsEnabled && constraints.length > 0) {
+    if (!checkConflicts(pairConstraints, fixedConstraints)) { hideLoading(); return; }
+  }
+
+  // Try strict first, then progressively relax
+  var genResult = null, relaxLevel = 0;
+  var relaxTries = [
+    {relax: 0, tries: 200},
+    {relax: 1, tries: 300},
+    {relax: 2, tries: 500}
+  ];
+
+  for (var ri = 0; ri < relaxTries.length; ri++) {
+    try {
+      genResult = generate(M, W, relaxTries[ri].tries, constraints, relaxTries[ri].relax, currentRounds, minDB, minWB, minMX);
+      relaxLevel = relaxTries[ri].relax;
+      if (genResult) break;
+    } catch(e) {}
+  }
+
+  if (!genResult) {
+    hideLoading();
+    if (constraints.length > 0) {
+      showError('无法在满足指定约束的条件下生成排阵,请检查约束是否与人数组合冲突,或减少指定条件');
+    } else {
+      showError('无法生成排阵,当前算法不支持该人数组合');
+    }
+    return;
+  }
+
+  hideLoading();
+  const result = genResult.matches;
+  const exactMatch = genResult.exact;
+  const suggestion = genResult.suggestion;
+
+  let msg = '✅ 排阵生成成功!';
+  if (!exactMatch && suggestion) {
+    msg += '(无法完全满足最低场次要求,建议排布:男双' + suggestion.db + '·女双' + suggestion.wb + '·混双' + suggestion.mx + ')';
+  }
+  msg += (relaxLevel > 0 ? '(已放宽重复搭档限制,允许重复 ' + relaxLevel + ' 次)' : '');
+  document.getElementById('success-msg').textContent = msg;
+  document.getElementById('success-msg').classList.add('show');
+
+  markConstrainedMatches(result, constraints);
+
+  // Store generation state for incremental round addition
+  lastGenState = buildGenState(M, W, result, currentRounds);
+
+  showResult(result, M, W, relaxLevel, constraints, currentRounds, !exactMatch, suggestion);
+  });
+});
+
+function buildGenState(M, W, matches, rounds) {
+  const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
+  const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
+  for (const m of matches) {
+    const [r, type, t1, t2] = m;
+    if (type === 'DB') {
+      for (const p of [...t1, ...t2]) mc[p]++;
+      usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+      usedDB.add(Math.min(...t2)+','+Math.max(...t2));
+    } else if (type === 'WB') {
+      for (const p of [...t1, ...t2]) fc[p]++;
+      usedWB.add(Math.min(...t1)+','+Math.max(...t1));
+      usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+    } else if (type === 'MX') {
+      mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++;
+      usedMX.add(t1[0]+','+t1[1]);
+      usedMX.add(t2[0]+','+t2[1]);
+    } else if (type === 'XW') {
+      mc[t1[0]]++; fc[t1[1]]++; fc[t2[0]]++; fc[t2[1]]++;
+      usedMX.add(t1[0]+','+t1[1]);  // Mixed pair
+      usedWB.add(Math.min(...t2)+','+Math.max(...t2));  // WB pair
+    } else if (type === 'XD') {
+      mc[t1[0]]++; mc[t2[0]]++; mc[t2[1]]++; fc[t1[1]]++;
+      usedMX.add(t1[0]+','+t1[1]);  // Mixed pair
+      usedDB.add(Math.min(...t2)+','+Math.max(...t2));  // DB pair
+    } else if (type === 'MB') {
+      for (const p of [...t1]) mc[p]++;
+      for (const p of [...t2]) fc[p]++;
+      usedDB.add(Math.min(...t1)+','+Math.max(...t1));
+      usedWB.add(Math.min(...t2)+','+Math.max(...t2));
+    }
+  }
+  return { M, W, matches: [...matches], usedDB, usedWB, usedMX, mc, fc, rounds };
+}
+let currentRoundCount = 5;
+let MAX_ROUNDS = 10;
+
+function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, suggestion) {
+  const el = document.getElementById('result');
+  el.classList.add('show');
+  N = N || currentRoundCount;
+  currentRoundCount = N;
+
+  const cp = (M+W)/4;
+  const totalMatches = matches.length;
+
+  // Relax badge
+  const badge = document.getElementById('relax-badge');
+  if (relaxLevel > 0) {
+    badge.innerHTML = '<span class="relax-badge relaxed">放宽约束 (允许重复 ' + relaxLevel + ' 次)</span>';
+  } else {
+    badge.innerHTML = '<span class="relax-badge strict">严格模式</span>';
+  }
+
+  // Summary
+  let dbCount = 0, wbCount = 0, mxCount = 0;
+  for (const m of matches) {
+    if (m[1] === 'DB') dbCount++;
+    else if (m[1] === 'WB') wbCount++;
+    else if (m[1] === 'MX') mxCount++;
+    else if (m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxCount++;
+  }
+  let conText = '';
+  if (constraints && constraints.length > 0) {
+    const satisfied = matches.filter(m => m[4]).length;
+    conText = ' · 📌 ' + satisfied + ' 场指定匹配';
+  }
+  let sugText = '';
+  if (showSuggestion && suggestion) {
+    sugText = ' · ⚠️ 建议排布：男双' + suggestion.db + '·女双' + suggestion.wb + '·混双' + suggestion.mx;
+  }
+  document.getElementById('summary-line').innerHTML =
+    '<span>👤 男 ' + M + ' 人 · 女 ' + W + ' 人</span>' +
+    '<span>🏸 ' + dbCount + ' 男双 · ' + wbCount + ' 女双 · ' + mxCount + ' 混双</span>' +
+    '<span>📅 ' + cp + ' 片场地 × ' + N + ' 轮' + conText + sugText + '</span>';
+
+  // All rounds on one page
+  renderAllRounds(matches, N);
+
+  // Round counter
+  document.getElementById('round-counter').textContent = N + '/' + MAX_ROUNDS;
+  document.getElementById('add-round-btn').style.display = N < MAX_ROUNDS ? 'inline-block' : 'none';
+
+  document.getElementById('seed-info').textContent =
+    '🎯 ' + M + '男' + W + '女 · ' + (relaxLevel > 0 ? '放宽重复搭档限制' : '零重复搭档') + ' · 每人' + N + '场';
+
+  renderPartnerStats(matches, M, W);
+  renderCoverage(matches, M, W);
+}
+
+function renderAllRounds(matches, N) {
+  const container = document.getElementById('all-rounds-container');
+  container.innerHTML = '';
+  N = N || currentRoundCount;
+
+  for (let r = 0; r < N; r++) {
+    const matchesInRound = matches.filter(m => m[0] === r + 1);
+
+    const section = document.createElement('div');
+    section.className = 'round-section';
+    section.id = 'round-section-' + r;
+
+    // Round header with controls
+    const header = document.createElement('div');
+    header.className = 'round-section-header';
+    header.innerHTML = '<span>🎾 第' + (r + 1) + '轮 (' + matchesInRound.length + '场)</span>';
+    header.style.flex = '1';
+
+    // Drag label
+    const dragLabel = document.createElement('span');
+    dragLabel.textContent = '⠿';
+    dragLabel.style.cssText = 'cursor:grab;font-size:16px;color:var(--gray);margin-left:auto;';
+    dragLabel.title = '拖拽调整轮次顺序';
+    dragLabel.draggable = true;
+    dragLabel.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', r);
+      dragLabel.style.opacity = '0.4';
+    });
+    dragLabel.addEventListener('dragend', () => dragLabel.style.opacity = '1');
+    header.appendChild(dragLabel);
+
+    // Delete button
+    if (N > 1) {
+      const delBtn = document.createElement('span');
+      delBtn.textContent = ' ×';
+      delBtn.style.cssText = 'cursor:pointer;font-size:16px;color:var(--red);font-weight:bold;margin-left:6px;';
+      delBtn.title = '删除本轮';
+      delBtn.addEventListener('click', () => deleteRound(r, matches, N));
+      header.appendChild(delBtn);
+    }
+
+    section.appendChild(header);
+
+    // Handle drops for reordering
+    section.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      section.style.borderColor = 'var(--green)';
+    });
+    section.addEventListener('dragleave', () => {
+      section.style.borderColor = 'var(--gray-light)';
+    });
+    section.addEventListener('drop', (e) => {
+      e.preventDefault();
+      section.style.borderColor = 'var(--gray-light)';
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIdx = r;
+      if (fromIdx === toIdx) return;
+      swapRounds(fromIdx, toIdx, matches, N);
+    });
+
+    // Match table
+    if (matchesInRound.length > 0) {
+      const table = document.createElement('table');
+      table.className = 'match-table';
+      table.innerHTML = '<thead><tr><th>🏟️ 场地</th><th>类型</th><th>对阵</th></tr></thead>';
+      const tbody = document.createElement('tbody');
+
+      matchesInRound.forEach((m, i) => {
+        const [round, type, t1, t2, constrained, lvlWarn] = m;
+        let team1Str, team2Str;
+        let lv1 = 0, lv2 = 0;
+        if (type === 'DB') {
+          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('M', t1[1], true);
+          team2Str = dispName('M', t2[0], true) + ' + ' + dispName('M', t2[1], true);
+          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
+          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
+        } else if (type === 'WB') {
+          team1Str = dispName('W', t1[0], true) + ' + ' + dispName('W', t1[1], true);
+          team2Str = dispName('W', t2[0], true) + ' + ' + dispName('W', t2[1], true);
+          lv1 = levelOf('W', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+        } else if (type === 'XW') {
+          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('W', t1[1], true);
+          team2Str = dispName('W', t2[0], true) + ' + ' + dispName('W', t2[1], true);
+          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+        } else if (type === 'XD') {
+          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('W', t1[1], true);
+          team2Str = dispName('M', t2[0], true) + ' + ' + dispName('M', t2[1], true);
+          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
+        } else if (type === 'MB') {
+          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('M', t1[1], true);
+          team2Str = dispName('W', t2[0], true) + ' + ' + dispName('W', t2[1], true);
+          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
+          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+        } else {
+          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('W', t1[1], true);
+          team2Str = dispName('M', t2[0], true) + ' + ' + dispName('W', t2[1], true);
+          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+          lv2 = levelOf('M', t2[0]) + levelOf('W', t2[1]);
+        }
+        const diff = Math.abs(lv1 - lv2);
+        let diffIcon = '⚔️ ';
+        if (diff > 0.5) diffIcon = '⚡ ';
+        if (diff > 1.5) diffIcon = '⚠️ ';
+        const diffText = diffIcon + lv1.toFixed(1) + ' vs ' + lv2.toFixed(1);
+        const tr = document.createElement('tr');
+        if (constrained) tr.style.backgroundColor = '#fff8e1';
+        if (lvlWarn) { tr.style.backgroundColor = '#fff3e0'; tr.title = 'Warning: NTRP diff >0.5, please verify player assignment'; }
+        tr.innerHTML = '<td>' + (i + 1) + ' 号场' + (constrained ? ' 📌' : '') + '</td>' +
+          '<td><span class="type-tag ' + TYPE_CLASS[type] + '">' + TYPE_LABELS[type] + '</span></td>' +
+          '<td><strong>' + team1Str + '</strong> vs <strong>' + team2Str + '</strong><br><small style="color:var(--gray);font-size:11px;">' + diffText + '</small></td>';
+        tbody.appendChild(tr);
+      });
+
+      table.appendChild(tbody);
+      section.appendChild(table);
+    } else {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:20px;text-align:center;color:var(--gray);';
+      empty.textContent = '本轮无比赛';
+      section.appendChild(empty);
+    }
+
+    container.appendChild(section);
+  }
+}
+
+function swapRounds(fromIdx, toIdx, matches, N) {
+  const fromMs = matches.filter(m => m[0] === fromIdx + 1);
+  const toMs = matches.filter(m => m[0] === toIdx + 1);
+  for (const m of fromMs) m[0] = toIdx + 1;
+  for (const m of toMs) m[0] = fromIdx + 1;
+
+  // Update any state
+  if (lastGenState) {
+    lastGenState.matches = matches;
+  }
+
+  renderAllRounds(matches, N);
+
+  let dbC = 0, wbC = 0, mxC = 0;
+  for (const m of matches) {
+    if (m[1] === 'DB') dbC++;
+    else if (m[1] === 'WB') wbC++;
+    else if (m[1] === 'MX' || m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxC++;
+  }
+  const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
+  document.getElementById('summary-line').innerHTML =
+    '<span>👤 男 ' + (lastGenState ? lastGenState.M : '?') + ' 人 · 女 ' + (lastGenState ? lastGenState.W : '?') + ' 人</span>' +
+    '<span>🏸 ' + dbC + ' 男双 · ' + wbC + ' 女双 · ' + mxC + ' 混双</span>' +
+    '<span>📅 ' + cp + ' 片场地 × ' + N + ' 轮</span>';
+}
+
+function deleteRound(r, matches, N) {
+  const newMatches = matches.filter(m => m[0] !== r + 1);
+  for (const m of newMatches) {
+    if (m[0] > r + 1) m[0]--;
+  }
+
+  const newN = N - 1;
+  currentRoundCount = newN;
+
+  if (lastGenState) {
+    lastGenState.matches = newMatches;
+    lastGenState.rounds = newN;
+    // Rebuild used sets from remaining matches
+    lastGenState.usedDB = new Set();
+    lastGenState.usedWB = new Set();
+    lastGenState.usedMX = new Set();
+    lastGenState.mc = new Array(lastGenState.M).fill(0);
+    lastGenState.fc = new Array(lastGenState.W).fill(0);
+    for (var _rm of newMatches) {
+      var _rt = _rm[1], _r1 = _rm[2], _r2 = _rm[3];
+      if (_rt === 'DB') {
+        lastGenState.usedDB.add(Math.min(..._r1)+','+Math.max(..._r1));
+        lastGenState.usedDB.add(Math.min(..._r2)+','+Math.max(..._r2));
+        for (var _rp of [..._r1, ..._r2]) lastGenState.mc[_rp]++;
+      } else if (_rt === 'WB') {
+        lastGenState.usedWB.add(Math.min(..._r1)+','+Math.max(..._r1));
+        lastGenState.usedWB.add(Math.min(..._r2)+','+Math.max(..._r2));
+        for (var _rp of [..._r1, ..._r2]) lastGenState.fc[_rp]++;
+      } else if (_rt === 'MX') {
+        lastGenState.usedMX.add(_r1[0]+','+_r1[1]);
+        lastGenState.usedMX.add(_r2[0]+','+_r2[1]);
+        lastGenState.mc[_r1[0]]++; lastGenState.mc[_r2[0]]++;
+        lastGenState.fc[_r1[1]]++; lastGenState.fc[_r2[1]]++;
+      } else if (_rt === 'XW') {
+        lastGenState.mc[_r1[0]]++; lastGenState.fc[_r1[1]]++;
+        lastGenState.fc[_r2[0]]++; lastGenState.fc[_r2[1]]++;
+      } else if (_rt === 'XD') {
+        lastGenState.mc[_r1[0]]++; lastGenState.mc[_r2[0]]++;
+        lastGenState.mc[_r2[1]]++; lastGenState.fc[_r1[1]]++;
+      } else if (_rt === 'MB') {
+        for (var _rp of [..._r1]) lastGenState.mc[_rp]++;
+        for (var _rp of [..._r2]) lastGenState.fc[_rp]++;
+        lastGenState.usedDB.add(Math.min(..._r1)+','+Math.max(..._r1));
+        lastGenState.usedWB.add(Math.min(..._r2)+','+Math.max(..._r2));
+      }
+    }
+  }
+
+  hideError();
+  document.getElementById('success-msg').textContent = '🗑️ 已删除第 ' + (r + 1) + ' 轮,剩余 ' + newN + ' 轮';
+  document.getElementById('success-msg').classList.add('show');
+  document.getElementById('round-counter').textContent = newN + '/' + MAX_ROUNDS;
+  document.getElementById('add-round-btn').style.display = newN < MAX_ROUNDS ? 'inline-block' : 'none';
+  renderAllRounds(newMatches, newN);
+}
+
 // ===== Constraint UI =====
 
 document.getElementById('constraint-toggle').addEventListener('change', function() {
@@ -2192,7 +3377,8 @@ document.getElementById('constraint-toggle').addEventListener('change', function
 
 function getPlayerOptions(includeEmpty) {
   return players.map((p, i) => {
-    const label = (p.name || '无名') + ' (' + p.gender + ')';
+    const icon = p.gender === '男' ? '♂' : '♀';
+    const label = icon + ' ' + (p.name || '无名');
     return `<option value="${i}">${label}</option>`;
   });
 }
@@ -2511,492 +3697,239 @@ function checkConflicts(pairCons, fixedCons) {
 }
 
 // ===== Loading Overlay =====
-function showLoading() {
-  document.getElementById('loading-overlay').classList.add('show');
-}
-function hideLoading() {
-  document.getElementById('loading-overlay').classList.remove('show');
-}
+// Highlight system for partner stats
+let highlightedPlayers = new Set();
 
-// ===== Generate =====
-
-document.getElementById('gen-btn').addEventListener('click', () => {
-  console.log('GENBTN: generating...');
-  hideError();
-  showLoading();
-  // Defer heavy computation so the loading overlay renders first
-  setTimeout(function _doGen() {
-  const mn = players.filter(p => p.gender === '男');
-  const wn = players.filter(p => p.gender === '女');
-  const M = mn.length, W = wn.length;
-
-  if (players.length === 0) { hideLoading(); showError('请先添加选手!'); return; }
-  for (const p of players) { if (!p.name.trim()) { hideLoading(); showError('请为所有选手填写姓名!'); return; } }
-  // Odd-odd is now supported with special courts (MXxWB/MXxDB)
-  if ((M % 2 === 1 && W % 2 === 0) || (M % 2 === 0 && W % 2 === 1)) {
-    hideLoading(); showError('男女人数必须同为偶数或同为奇数(当前男' + M + '人,女' + W + '人)'); return;
-  }
-  if ((M + W) % 4 !== 0) { hideLoading(); showError('总人数必须是4的倍数(当前共' + (M+W) + '人)'); return; }
-
-  maleNames = mn.map(p => p.name.trim());
-  femaleNames = wn.map(p => p.name.trim());
-
-  const currentRounds = currentRoundCount || 1;
-
-  const constraintsEnabled = document.getElementById('constraint-toggle').checked;
-  let constraints = [];
-  if (constraintsEnabled) {
-    constraints = [...pairConstraints, ...fixedConstraints];
-  }
-
-  const minDB = getMinInput('min-db');
-  const minWB = getMinInput('min-wb');
-  const minMX = getMinInput('min-mx');
-
-  // Conflict detection
-  if (constraintsEnabled && constraints.length > 0) {
-    if (!checkConflicts(pairConstraints, fixedConstraints)) { hideLoading(); return; }
-  }
-
-  // Try strict first, then progressively relax
-  var genResult = null, relaxLevel = 0;
-  var relaxTries = [
-    {relax: 0, tries: 200},
-    {relax: 1, tries: 300},
-    {relax: 2, tries: 500}
-  ];
-  
-  for (var ri = 0; ri < relaxTries.length; ri++) {
-    try {
-      genResult = generate(M, W, relaxTries[ri].tries, constraints, relaxTries[ri].relax, currentRounds, minDB, minWB, minMX);
-      relaxLevel = relaxTries[ri].relax;
-      if (genResult) break;
-    } catch(e) {}
-  }
-
-  if (!genResult) {
-    hideLoading();
-    if (constraints.length > 0) {
-      showError('无法在满足指定约束的条件下生成排阵,请检查约束是否与人数组合冲突,或减少指定条件');
-    } else {
-      showError('无法生成排阵,当前算法不支持该人数组合');
-    }
-    return;
-  }
-
-  hideLoading();
-  const result = genResult.matches;
-  const exactMatch = genResult.exact;
-  const suggestion = genResult.suggestion;
-
-  let msg = '✅ 排阵生成成功!';
-  if (!exactMatch && suggestion) {
-    msg += '(无法完全满足最低场次要求,建议排布:男双' + suggestion.db + '·女双' + suggestion.wb + '·混双' + suggestion.mx + ')';
-  }
-  msg += (relaxLevel > 0 ? '(已放宽重复搭档限制,允许重复 ' + relaxLevel + ' 次)' : '');
-  document.getElementById('success-msg').textContent = msg;
-  document.getElementById('success-msg').classList.add('show');
-
-  markConstrainedMatches(result, constraints);
-
-  // Store generation state for incremental round addition
-  lastGenState = buildGenState(M, W, result, currentRounds);
-
-  showResult(result, M, W, relaxLevel, constraints, currentRounds, !exactMatch, suggestion);
-  });
-});
-
-function buildGenState(M, W, matches, rounds) {
-  const usedDB = new Set(), usedWB = new Set(), usedMX = new Set();
-  const mc = new Array(M).fill(0), fc = new Array(W).fill(0);
-  for (const m of matches) {
-    const [r, type, t1, t2] = m;
-    if (type === 'DB') {
-      for (const p of [...t1, ...t2]) mc[p]++;
-      usedDB.add(Math.min(...t1)+','+Math.max(...t1));
-      usedDB.add(Math.min(...t2)+','+Math.max(...t2));
-    } else if (type === 'WB') {
-      for (const p of [...t1, ...t2]) fc[p]++;
-      usedWB.add(Math.min(...t1)+','+Math.max(...t1));
-      usedWB.add(Math.min(...t2)+','+Math.max(...t2));
-    } else if (type === 'MX') {
-      mc[t1[0]]++; mc[t2[0]]++; fc[t1[1]]++; fc[t2[1]]++;
-      usedMX.add(t1[0]+','+t1[1]);
-      usedMX.add(t2[0]+','+t2[1]);
-    } else if (type === 'XW') {
-      mc[t1[0]]++; fc[t1[1]]++; fc[t2[0]]++; fc[t2[1]]++;
-      usedMX.add(t1[0]+','+t1[1]);  // Mixed pair
-      usedWB.add(Math.min(...t2)+','+Math.max(...t2));  // WB pair
-    } else if (type === 'XD') {
-      mc[t1[0]]++; mc[t2[0]]++; mc[t2[1]]++; fc[t1[1]]++;
-      usedMX.add(t1[0]+','+t1[1]);  // Mixed pair
-      usedDB.add(Math.min(...t2)+','+Math.max(...t2));  // DB pair
-    } else if (type === 'MB') {
-      for (const p of [...t1]) mc[p]++;
-      for (const p of [...t2]) fc[p]++;
-      usedDB.add(Math.min(...t1)+','+Math.max(...t1));
-      usedWB.add(Math.min(...t2)+','+Math.max(...t2));
-    }
-  }
-  return { M, W, matches: [...matches], usedDB, usedWB, usedMX, mc, fc, rounds };
-}let currentRoundCount = 5;
-let MAX_ROUNDS = 10;
-
-function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, suggestion) {
-  const el = document.getElementById('result');
-  el.classList.add('show');
-  N = N || currentRoundCount;
-  currentRoundCount = N;
-
-  const cp = (M+W)/4;
-  const totalMatches = matches.length;
-
-  // Relax badge
-  const badge = document.getElementById('relax-badge');
-  if (relaxLevel > 0) {
-    badge.innerHTML = `<span class="relax-badge relaxed">放宽约束 (允许重复 ${relaxLevel} 次)</span>`;
+function toggleHighlight(playerKey) {
+  if (highlightedPlayers.has(playerKey)) {
+    highlightedPlayers.delete(playerKey);
   } else {
-    badge.innerHTML = `<span class="relax-badge strict">严格模式</span>`;
+    highlightedPlayers.add(playerKey);
   }
-
-  // Summary
-  let dbCount = 0, wbCount = 0, mxCount = 0;
-  for (const m of matches) {
-    if (m[1] === 'DB') dbCount++;
-    else if (m[1] === 'WB') wbCount++;
-    else if (m[1] === 'MX') mxCount++;
-    else if (m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxCount++;
-  }
-  let conText = '';
-  if (constraints && constraints.length > 0) {
-    const satisfied = matches.filter(m => m[4]).length;
-    conText = ' · \u{1F4CC} ' + satisfied + ' \u573A\u6307\u5B9A\u5339\u914D';
-  }
-  let sugText = '';
-  if (showSuggestion && suggestion) {
-    sugText = ' · \u26A0\uFE0F \u5EFA\u8BAE\u6392\u5E03\uFF1A\u7537\u53CC' + suggestion.db + '\u00B7\u5973\u53CC' + suggestion.wb + '\u00B7\u6DF7\u53CC' + suggestion.mx;
-  }
-  document.getElementById('summary-line').innerHTML =
-    '<span>\u{1F464} \u7537 ' + M + ' \u4EBA \u00B7 \u5973 ' + W + ' \u4EBA</span>' +
-    '<span>\u{1F3F8} ' + dbCount + ' \u7537\u53CC \u00B7 ' + wbCount + ' \u5973\u53CC \u00B7 ' + mxCount + ' \u6DF7\u53CC</span>' +
-    '<span>\u{1F4C5} ' + cp + ' \u7247\u573A\u5730 \u00D7 ' + N + ' \u8F6E' + conText + sugText + '</span>';
-
-  // All rounds on one page
-  renderAllRounds(matches, N);
-
-  // Round counter
-  document.getElementById('round-counter').textContent = N + '/' + MAX_ROUNDS;
-  document.getElementById('add-round-btn').style.display = N < MAX_ROUNDS ? 'inline-block' : 'none';
-
-  document.getElementById('seed-info').textContent =
-    '💡 ' + M + '男' + W + '女 · ' + (relaxLevel > 0 ? '放宽重复搭档限制' : '零重复搭档') + ' · 每人' + N + '场';
-
-  renderPartnerStats(matches, M, W);
-  renderCoverage(matches, M, W);
-}
-
-function renderAllRounds(matches, N) {
-  const container = document.getElementById('all-rounds-container');
-  container.innerHTML = '';
-  N = N || currentRoundCount;
-
-  for (let r = 0; r < N; r++) {
-    const matchesInRound = matches.filter(m => m[0] === r + 1);
-
-    const section = document.createElement('div');
-    section.className = 'round-section';
-    section.id = 'round-section-' + r;
-
-    // Round header with controls
-    const header = document.createElement('div');
-    header.className = 'round-section-header';
-    header.innerHTML = '<span>🎾 第' + (r + 1) + '轮 (' + matchesInRound.length + '场)</span>';
-    header.style.flex = '1';
-
-    // Drag label
-    const dragLabel = document.createElement('span');
-    dragLabel.textContent = '↕';
-    dragLabel.style.cssText = 'cursor:grab;font-size:16px;color:var(--gray);margin-left:auto;';
-    dragLabel.title = '拖拽调整轮次顺序';
-    dragLabel.draggable = true;
-    dragLabel.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', r);
-      dragLabel.style.opacity = '0.4';
-    });
-    dragLabel.addEventListener('dragend', () => dragLabel.style.opacity = '1');
-    header.appendChild(dragLabel);
-
-    // Delete button
-    if (N > 1) {
-      const delBtn = document.createElement('span');
-      delBtn.textContent = ' ×';
-      delBtn.style.cssText = 'cursor:pointer;font-size:16px;color:var(--red);font-weight:bold;margin-left:6px;';
-      delBtn.title = '删除本轮';
-      delBtn.addEventListener('click', () => deleteRound(r, matches, N));
-      header.appendChild(delBtn);
-    }
-
-    section.appendChild(header);
-
-    // Handle drops for reordering
-    section.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      section.style.borderColor = 'var(--green)';
-    });
-    section.addEventListener('dragleave', () => {
-      section.style.borderColor = 'var(--gray-light)';
-    });
-    section.addEventListener('drop', (e) => {
-      e.preventDefault();
-      section.style.borderColor = 'var(--gray-light)';
-      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-      const toIdx = r;
-      if (fromIdx === toIdx) return;
-      swapRounds(fromIdx, toIdx, matches, N);
-    });
-
-    // Match table
-    if (matchesInRound.length > 0) {
-      const table = document.createElement('table');
-      table.className = 'match-table';
-      table.innerHTML = '<thead><tr><th>🏟️ 场地</th><th>类型</th><th>对阵</th></tr></thead>';
-      const tbody = document.createElement('tbody');
-
-      matchesInRound.forEach((m, i) => {
-        const [round, type, t1, t2, constrained, lvlWarn] = m;
-        let team1Str, team2Str;
-        let lv1 = 0, lv2 = 0;
-        if (type === 'DB') {
-          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('M', t1[1]) + '(' + levelOf('M', t1[1]) + ')';
-          team2Str = nameOf('M', t2[0]) + '(' + levelOf('M', t2[0]) + ')' + ' + ' + nameOf('M', t2[1]) + '(' + levelOf('M', t2[1]) + ')';
-          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
-          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
-        } else if (type === 'WB') {
-          team1Str = nameOf('W', t1[0]) + '(' + levelOf('W', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
-          team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
-          lv1 = levelOf('W', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
-        } else if (type === 'XW') {
-          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
-          team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
-          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
-        } else if (type === 'XD') {
-          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
-          team2Str = nameOf('M', t2[0]) + '(' + levelOf('M', t2[0]) + ')' + ' + ' + nameOf('M', t2[1]) + '(' + levelOf('M', t2[1]) + ')';
-          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
-        } else if (type === 'MB') {
-          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('M', t1[1]) + '(' + levelOf('M', t1[1]) + ')';
-          team2Str = nameOf('W', t2[0]) + '(' + levelOf('W', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
-          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
-          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
-        } else {
-          team1Str = nameOf('M', t1[0]) + '(' + levelOf('M', t1[0]) + ')' + ' + ' + nameOf('W', t1[1]) + '(' + levelOf('W', t1[1]) + ')';
-          team2Str = nameOf('M', t2[0]) + '(' + levelOf('M', t2[0]) + ')' + ' + ' + nameOf('W', t2[1]) + '(' + levelOf('W', t2[1]) + ')';
-          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('M', t2[0]) + levelOf('W', t2[1]);
-        }
-        const diff = Math.abs(lv1 - lv2);
-        let diffIcon = '\u2694\uFE0F ';
-        if (diff > 0.5) diffIcon = '\u26A1 ';
-        if (diff > 1.5) diffIcon = '\u26A0\uFE0F ';
-        const diffText = diffIcon + lv1.toFixed(1) + ' vs ' + lv2.toFixed(1);
-        const tr = document.createElement('tr');
-        if (constrained) tr.style.backgroundColor = '#fff8e1';
-        if (lvlWarn) { tr.style.backgroundColor = '#fff3e0'; tr.title = 'Warning: NTRP diff >0.5, please verify player assignment'; }
-        tr.innerHTML = '<td>' + (i + 1) + ' 号场' + (constrained ? ' 📌' : '') + '</td>' +
-          '<td><span class="type-tag ' + TYPE_CLASS[type] + '">' + TYPE_LABELS[type] + '</span></td>' +
-          '<td><strong>' + team1Str + '</strong> vs <strong>' + team2Str + '</strong><br><small style="color:var(--gray);font-size:11px;">' + diffText + '</small></td>';
-        tbody.appendChild(tr);
-      });
-
-      table.appendChild(tbody);
-      section.appendChild(table);
-    } else {
-      const empty = document.createElement('div');
-      empty.style.cssText = 'padding:20px;text-align:center;color:var(--gray);';
-      empty.textContent = '本轮无比赛';
-      section.appendChild(empty);
-    }
-
-    container.appendChild(section);
-  }
-}
-
-function swapRounds(fromIdx, toIdx, matches, N) {
-  const fromMs = matches.filter(m => m[0] === fromIdx + 1);
-  const toMs = matches.filter(m => m[0] === toIdx + 1);
-  for (const m of fromMs) m[0] = toIdx + 1;
-  for (const m of toMs) m[0] = fromIdx + 1;
-
-  // Update any state
-  if (lastGenState) {
-    lastGenState.matches = matches;
-  }
-
-  renderAllRounds(matches, N);
-
-  let dbC = 0, wbC = 0, mxC = 0;
-  for (const m of matches) {
-    if (m[1] === 'DB') dbC++;
-    else if (m[1] === 'WB') wbC++;
-    else if (m[1] === 'MX' || m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxC++;
-  }
-  const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
-  document.getElementById('summary-line').innerHTML =
-    '<span>\u{1F464} \u7537 ' + (lastGenState ? lastGenState.M : '?') + ' \u4EBA \u00B7 \u5973 ' + (lastGenState ? lastGenState.W : '?') + ' \u4EBA</span>' +
-    '<span>\u{1F3F8} ' + dbC + ' \u7537\u53CC \u00B7 ' + wbC + ' \u5973\u53CC \u00B7 ' + mxC + ' \u6DF7\u53CC</span>' +
-    '<span>\u{1F4C5} ' + cp + ' \u7247\u573A\u5730 \u00D7 ' + N + ' \u8F6E</span>';
-}
-
-function deleteRound(r, matches, N) {
-  const newMatches = matches.filter(m => m[0] !== r + 1);
-  for (const m of newMatches) {
-    if (m[0] > r + 1) m[0]--;
-  }
-
-  const newN = N - 1;
-  currentRoundCount = newN;
-
-  if (lastGenState) {
-    lastGenState.matches = newMatches;
-    lastGenState.rounds = newN;
-    // Rebuild used sets from remaining matches
-    lastGenState.usedDB = new Set();
-    lastGenState.usedWB = new Set();
-    lastGenState.usedMX = new Set();
-    lastGenState.mc = new Array(lastGenState.M).fill(0);
-    lastGenState.fc = new Array(lastGenState.W).fill(0);
-    for (var _rm of newMatches) {
-      var _rt = _rm[1], _r1 = _rm[2], _r2 = _rm[3];
-      if (_rt === 'DB') {
-        lastGenState.usedDB.add(Math.min(..._r1)+','+Math.max(..._r1));
-        lastGenState.usedDB.add(Math.min(..._r2)+','+Math.max(..._r2));
-        for (var _rp of [..._r1, ..._r2]) lastGenState.mc[_rp]++;
-      } else if (_rt === 'WB') {
-        lastGenState.usedWB.add(Math.min(..._r1)+','+Math.max(..._r1));
-        lastGenState.usedWB.add(Math.min(..._r2)+','+Math.max(..._r2));
-        for (var _rp of [..._r1, ..._r2]) lastGenState.fc[_rp]++;
-      } else if (_rt === 'MX') {
-        lastGenState.usedMX.add(_r1[0]+','+_r1[1]);
-        lastGenState.usedMX.add(_r2[0]+','+_r2[1]);
-        lastGenState.mc[_r1[0]]++; lastGenState.mc[_r2[0]]++;
-        lastGenState.fc[_r1[1]]++; lastGenState.fc[_r2[1]]++;
-      } else if (_rt === 'XW') {
-        lastGenState.mc[_r1[0]]++; lastGenState.fc[_r1[1]]++;
-        lastGenState.fc[_r2[0]]++; lastGenState.fc[_r2[1]]++;
-      } else if (_rt === 'XD') {
-        lastGenState.mc[_r1[0]]++; lastGenState.mc[_r2[0]]++;
-        lastGenState.mc[_r2[1]]++; lastGenState.fc[_r1[1]]++;
-      } else if (_rt === 'MB') {
-        for (var _rp of [..._r1]) lastGenState.mc[_rp]++;
-        for (var _rp of [..._r2]) lastGenState.fc[_rp]++;
-        lastGenState.usedDB.add(Math.min(..._r1)+','+Math.max(..._r1));
-        lastGenState.usedWB.add(Math.min(..._r2)+','+Math.max(..._r2));
+  // Update name badge style
+  document.querySelectorAll('.partner-stat-card .name').forEach(function(el) {
+    var key = el.getAttribute('data-player');
+    if (key) {
+      if (highlightedPlayers.has(key)) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
       }
     }
-  }
-
-  hideError();
-  document.getElementById('success-msg').textContent = '\u2705 \u5DF2\u5220\u9664\u7B2C ' + (r + 1) + ' \u8F6E\uFF0C\u5F53\u524D\u5269 ' + newN + ' \u8F6E';
-  document.getElementById('success-msg').classList.add('show');
-
-  let dbC = 0, wbC = 0, mxC = 0;
-  for (const m of newMatches) {
-    if (m[1] === 'DB') dbC++;
-    else if (m[1] === 'WB') wbC++;
-    else if (m[1] === 'MX' || m[1] === 'XW' || m[1] === 'XD' || m[1] === 'MB') mxC++;
-  }
-  const cp = (lastGenState ? lastGenState.M + lastGenState.W : 8) / 4;
-  document.getElementById('summary-line').innerHTML =
-    '<span>\u{1F464} \u7537 ' + (lastGenState ? lastGenState.M : '?') + ' \u4EBA \u00B7 \u5973 ' + (lastGenState ? lastGenState.W : '?') + ' \u4EBA</span>' +
-    '<span>\u{1F3F8} ' + dbC + ' \u7537\u53CC \u00B7 ' + wbC + ' \u5973\u53CC \u00B7 ' + mxC + ' \u6DF7\u53CC</span>' +
-    '<span>\u{1F4C5} ' + cp + ' \u7247\u573A\u5730 \u00D7 ' + newN + ' \u8F6E</span>';
-
-  renderAllRounds(newMatches, newN);
-  document.getElementById('round-counter').textContent = newN + '/' + MAX_ROUNDS;
-  document.getElementById('add-round-btn').style.display = newN < MAX_ROUNDS ? 'inline-block' : 'none';
-  document.getElementById('seed-info').textContent =
-    '\u{1F4A1} ' + (lastGenState ? lastGenState.M + '\u7537' + lastGenState.W + '\u5973' : '') + ' \u00B7 \u6BCF\u4EBA' + newN + '\u573A';
-
-  renderPartnerStats(newMatches, lastGenState ? lastGenState.M : 4, lastGenState ? lastGenState.W : 4);
-  renderCoverage(newMatches, lastGenState ? lastGenState.M : 4, lastGenState ? lastGenState.W : 4);
+  });
+  // Update match row highlights
+  document.querySelectorAll('#all-rounds-container .match-row').forEach(function(row) {
+    var players = (row.getAttribute('data-players') || '').split(',');
+    var shouldHighlight = false;
+    for (var _hp of highlightedPlayers) {
+      if (players.indexOf(_hp) >= 0) { shouldHighlight = true; break; }
+    }
+    if (shouldHighlight) {
+      row.classList.add('highlight');
+    } else {
+      row.classList.remove('highlight');
+    }
+  });
 }
 
+// ---- Save/Load local data ----
+function gatherSaveData() {
+  // Players
+  var pData = [];
+  for (var i = 0; i < players.length; i++) {
+    pData.push({name: players[i].name, gender: players[i].gender, level: players[i].level || 3.0});
+  }
+  // Constraints
+  var consData = [];
+  for (var i = 0; i < pairConstraints.length; i++) {
+    var pc = pairConstraints[i];
+    consData.push({type: 'pair', p1: pc.p1, p2: pc.p2, rel: pc.rel, gender: pc.gender, sameGender: pc.sameGender, rounds: pc.rounds || 0});
+  }
+  for (var i = 0; i < fixedConstraints.length; i++) {
+    var fc = fixedConstraints[i];
+    // fixedConstraints store {a:{g,i}, b:{g,i}, c:{g,i}, d:{g,i}, rounds}
+    // Save the raw objects; they reference player indices that may shift on reload
+    consData.push({type: 'fixed', a: {g: fc.a.g, i: fc.a.i}, b: {g: fc.b.g, i: fc.b.i}, c: {g: fc.c.g, i: fc.c.i}, d: {g: fc.d.g, i: fc.d.i}, rounds: fc.rounds || 0});
+  }
+  // Mode
+  var modeEl = document.querySelector('.mode-btn.active');
+  var mode = modeEl ? modeEl.getAttribute('data-mode') : 'default';
+  // Min values
+  var minDB = parseInt(document.getElementById('min-db').value) || 0;
+  var minWB = parseInt(document.getElementById('min-wb').value) || 0;
+  var minMX = parseInt(document.getElementById('min-mx').value) || 0;
+  // Date/Time
+  var dateVal = document.querySelector('input[type="date"]')?.value || '';
+  var timeVal = document.querySelector('input[type="time"]')?.value || '';
+
+  return {players: pData, constraints: consData, mode: mode, minDB: minDB, minWB: minWB, minMX: minMX, date: dateVal, time: timeVal, version: 1};
+}
+
+function saveToLocal() {
+  try {
+    var data = gatherSaveData();
+    localStorage.setItem('tennis_schedule_data', JSON.stringify(data));
+    document.getElementById('success-msg').textContent = '✅ 已保存本地！（选手 + 指定对局 + 配置）';
+    document.getElementById('success-msg').classList.add('show');
+    setTimeout(function(){ document.getElementById('success-msg').classList.remove('show'); }, 3000);
+  } catch(e) {
+    showError('保存失败：' + e.message);
+  }
+}
+
+function loadFromLocal() {
+  try {
+    var raw = localStorage.getItem('tennis_schedule_data');
+    if (!raw) { showError('没有找到保存的数据'); return; }
+    var data = JSON.parse(raw);
+    if (!data.players || data.players.length === 0) { showError('保存数据中没有选手'); return; }
+
+    // Clear existing
+    players.length = 0;
+    pairConstraints.length = 0;
+    fixedConstraints.length = 0;
+
+    // Load players
+    for (var i = 0; i < data.players.length; i++) {
+      players.push({name: data.players[i].name, gender: data.players[i].gender, level: data.players[i].level || 3.0});
+    }
+
+    // Load mode
+    if (data.mode) {
+      document.querySelectorAll('.mode-btn').forEach(function(el) { el.classList.remove('active'); });
+      var modeTarget = document.querySelector('.mode-btn[data-mode="' + data.mode + '"]');
+      if (modeTarget) modeTarget.classList.add('active');
+    }
+
+    // Load min values
+    if (data.minDB !== undefined) document.getElementById('min-db').value = data.minDB;
+    if (data.minWB !== undefined) document.getElementById('min-wb').value = data.minWB;
+    if (data.minMX !== undefined) document.getElementById('min-mx').value = data.minMX;
+
+    // Load date/time
+    if (data.date) {
+      var dateInput = document.querySelector('input[type="date"]');
+      if (dateInput) dateInput.value = data.date;
+    }
+    if (data.time) {
+      var timeInput = document.querySelector('input[type="time"]');
+      if (timeInput) timeInput.value = data.time;
+    }
+
+    // Re-render players
+    renderPlayerList();
+
+    // Load constraints (need players rendered first so indices are valid)
+    if (data.constraints) {
+      for (var ci = 0; ci < data.constraints.length; ci++) {
+        var con = data.constraints[ci];
+        if (con.type === 'pair') {
+          pairConstraints.push({p1: con.p1, p2: con.p2, rel: con.rel || 'partner', gender: con.gender, sameGender: con.sameGender, rounds: con.rounds || 0});
+        } else if (con.type === 'fixed') {
+          // Find player indices from the stored {g, i} objects
+          fixedConstraints.push({a: {g: con.a.g, i: con.a.i}, b: {g: con.b.g, i: con.b.i}, c: {g: con.c.g, i: con.c.i}, d: {g: con.d.g, i: con.d.i}, rounds: con.rounds || 0});
+        }
+      }
+      // Re-render constraints
+      renderPairConList();
+      renderFixedConList();
+    }
+
+    document.getElementById('success-msg').textContent = '✅ 已加载本地数据！（' + data.players.length + '人）';
+    document.getElementById('success-msg').classList.add('show');
+    setTimeout(function(){ document.getElementById('success-msg').classList.remove('show'); }, 3000);
+  } catch(e) {
+    showError('加载失败：' + e.message);
+  }
+}
+
+// ---- End save/load ----
+
+
 function renderPartnerStats(matches, M, W) {
-  const grid = document.getElementById('stats-grid');
-  grid.innerHTML = '';
-  const mp = {}, wp = {};
-  for (let i = 0; i < M; i++) mp[i] = { dbP: {}, dbO: {}, mxP: {}, mxO: {} };
-  for (let i = 0; i < W; i++) wp[i] = { dbP: {}, dbO: {}, mxP: {}, mxO: {} };
-
-  function inc(obj, key) { obj[key] = (obj[key] || 0) + 1; }
-
+  var mp = {}, wp = {};
+  for (var i = 0; i < M; i++) mp[i] = { P: {}, O: {} };
+  for (var i = 0; i < W; i++) wp[i] = { P: {}, O: {} };
+  function inc(obj, k) { obj[k] = (obj[k] || 0) + 1; }
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') {
-      inc(mp[t1[0]].dbP, 'M' + t1[1]); inc(mp[t1[1]].dbP, 'M' + t1[0]);
-      inc(mp[t2[0]].dbP, 'M' + t2[1]); inc(mp[t2[1]].dbP, 'M' + t2[0]);
-      // Opponents: team1 players vs team2 players
-      for (const a of t1) for (const b of t2) { inc(mp[a].dbO, 'M' + b); inc(mp[b].dbO, 'M' + a); }
+      // t1=[m1,m2] VS t2=[m3,m4] | teams: (m1,m2) vs (m3,m4)
+      inc(mp[t1[0]].P, 'M' + t1[1]); inc(mp[t1[1]].P, 'M' + t1[0]);
+      inc(mp[t2[0]].P, 'M' + t2[1]); inc(mp[t2[1]].P, 'M' + t2[0]);
+      for (const a of t1) for (const b of t2) { inc(mp[a].O, 'M' + b); inc(mp[b].O, 'M' + a); }
     } else if (type === 'WB') {
-      inc(wp[t1[0]].dbP, 'W' + t1[1]); inc(wp[t1[1]].dbP, 'W' + t1[0]);
-      inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
-      for (const a of t1) for (const b of t2) { inc(wp[a].dbO, 'W' + b); inc(wp[b].dbO, 'W' + a); }
+      // t1=[w1,w2] VS t2=[w3,w4]
+      inc(wp[t1[0]].P, 'W' + t1[1]); inc(wp[t1[1]].P, 'W' + t1[0]);
+      inc(wp[t2[0]].P, 'W' + t2[1]); inc(wp[t2[1]].P, 'W' + t2[0]);
+      for (const a of t1) for (const b of t2) { inc(wp[a].O, 'W' + b); inc(wp[b].O, 'W' + a); }
     } else if (type === 'MX') {
-      inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
-      inc(mp[t2[0]].mxP, 'W' + t2[1]); inc(wp[t2[1]].mxP, 'M' + t2[0]);
-      // MX opponents: team1 vs team2
-      inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(wp[t2[1]].mxO, 'M' + t1[0]);
-      inc(mp[t2[0]].mxO, 'W' + t1[1]); inc(wp[t1[1]].mxO, 'M' + t2[0]);
+      // t1=[m1,w1] VS t2=[m2,w2] | teams: (m1,w1) vs (m2,w2)
+      inc(mp[t1[0]].P, 'W' + t1[1]); inc(wp[t1[1]].P, 'M' + t1[0]);
+      inc(mp[t2[0]].P, 'W' + t2[1]); inc(wp[t2[1]].P, 'M' + t2[0]);
+      // same gender cross-court opponents
+      inc(mp[t1[0]].O, 'M' + t2[0]); inc(mp[t2[0]].O, 'M' + t1[0]);
+      inc(wp[t1[1]].O, 'W' + t2[1]); inc(wp[t2[1]].O, 'W' + t1[1]);
     } else if (type === 'XW') {
-      inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
-      inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
-      inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(wp[t2[1]].mxO, 'M' + t1[0]);
-      inc(wp[t1[1]].mxO, 'W' + t2[0]); inc(wp[t2[0]].mxO, 'W' + t1[1]);
+      // t1=[m1,w1] VS t2=[w2,w3] | teams: (m1,w1) vs (w2,w3)
+      inc(mp[t1[0]].P, 'W' + t1[1]); inc(wp[t1[1]].P, 'M' + t1[0]);
+      inc(wp[t2[0]].P, 'W' + t2[1]); inc(wp[t2[1]].P, 'W' + t2[0]);
+      // t1 vs t2: all players on t1 oppose all players on t2
+      for (const b of t2) { inc(mp[t1[0]].O, 'W' + b); inc(wp[t1[1]].O, 'W' + b); }
+      inc(wp[t2[0]].O, 'M' + t1[0]); inc(wp[t2[0]].O, 'W' + t1[1]);
+      inc(wp[t2[1]].O, 'M' + t1[0]); inc(wp[t2[1]].O, 'W' + t1[1]);
     } else if (type === 'XD') {
-      inc(mp[t1[0]].mxP, 'W' + t1[1]); inc(wp[t1[1]].mxP, 'M' + t1[0]);
-      inc(mp[t2[0]].dbP, 'M' + t2[1]); inc(mp[t2[1]].dbP, 'M' + t2[0]);
-      inc(mp[t1[0]].mxO, 'W' + t2[1]); inc(mp[t2[1]].mxO, 'W' + t1[0]);
-      inc(wp[t1[1]].mxO, 'M' + t2[0]); inc(mp[t2[0]].mxO, 'W' + t1[1]);
+      // t1=[m1,w1] VS t2=[m2,m3] | teams: (m1,w1) vs (m2,m3)
+      inc(mp[t1[0]].P, 'W' + t1[1]); inc(wp[t1[1]].P, 'M' + t1[0]);
+      inc(mp[t2[0]].P, 'M' + t2[1]); inc(mp[t2[1]].P, 'M' + t2[0]);
+      // t1 vs t2
+      inc(mp[t1[0]].O, 'M' + t2[0]); inc(mp[t1[0]].O, 'M' + t2[1]);
+      inc(wp[t1[1]].O, 'M' + t2[0]); inc(wp[t1[1]].O, 'M' + t2[1]);
+      inc(mp[t2[0]].O, 'M' + t1[0]); inc(mp[t2[0]].O, 'W' + t1[1]);
+      inc(mp[t2[1]].O, 'M' + t1[0]); inc(mp[t2[1]].O, 'W' + t1[1]);
     } else if (type === 'MB') {
-      inc(mp[t1[0]].dbP, 'M' + t1[1]); inc(mp[t1[1]].dbP, 'M' + t1[0]);
-      inc(wp[t2[0]].dbP, 'W' + t2[1]); inc(wp[t2[1]].dbP, 'W' + t2[0]);
-      for (const a of t1) for (const b of t2) { inc(mp[a].dbO, 'W' + b); inc(wp[b].dbO, 'M' + a); }
+      // t1=[m1,m2] VS t2=[w1,w2] | teams: (m1,m2) vs (w1,w2)
+      inc(mp[t1[0]].P, 'M' + t1[1]); inc(mp[t1[1]].P, 'M' + t1[0]);
+      inc(wp[t2[0]].P, 'W' + t2[1]); inc(wp[t2[1]].P, 'W' + t2[0]);
+      // t1 vs t2: men oppose women, women oppose men
+      for (const a of t1) for (const b of t2) { inc(mp[a].O, 'W' + b); inc(wp[b].O, 'M' + a); }
     }
   }
-
-  function fmt(obj, prefix) {
-    const keys = Object.keys(obj);
+  var cards = [];
+  function fmt(obj, label) {
+    var keys = Object.keys(obj);
     if (keys.length === 0) return '';
-    return keys.map(k => {
-      const label = nameOf(prefix === 'M' ? 'M' : 'W', parseInt(k.replace(/[MW]/, '')));
-      return '<span>' + label + ' \u00D7' + obj[k] + '</span>';
-    }).join(' ');
+    var items = [];
+    keys.forEach(function(k) {
+      var cnt = obj[k];
+      if (cnt < 2) return;
+      var prefix = k[0] === 'M' ? 'M' : 'W';
+      var idx = parseInt(k.substring(1));
+      var name = dispNamePlain(prefix, idx);
+      var cls = label === '\u642D\u6863' ? 'team' : 'opp';
+      items.push('<span class=\"tag ' + cls + '\">' + name + ' \u00D7' + cnt + '</span>');
+    });
+    return items.join(' ');
   }
-
-  function makeCard(name, P, O) {
-    const card = document.createElement('div');
-    card.className = 'stat-card';
-    var html = '<div class="name">\u{1F464} ' + name + '</div><div class="detail">';
-    var partnerPart = fmt(P.dbP, 'M');
-    if (partnerPart) html += '<div>\u{1F3BE} \u53CC\u6253\u961F\u53CB: ' + partnerPart + '</div>';
-    var oppPart = fmt(P.dbO, 'M');
-    if (oppPart) html += '<div style="color:#888;">\u{1F3BE} \u53CC\u6253\u5BF9\u624B: ' + oppPart + '</div>';
-    var mxPP = fmt(P.mxP, 'W');
-    if (mxPP) html += '<div>\u{1F3BE} \u6DF7\u53CC\u642D\u6863: ' + mxPP + '</div>';
-    var mxOP = fmt(P.mxO, 'W');
-    if (mxOP) html += '<div style="color:#888;">\u{1F3BE} \u6DF7\u53CC\u5BF9\u624B: ' + mxOP + '</div>';
-    html += '</div>';
-    card.innerHTML = html;
-    return card;
+  for (var i = 0; i < M; i++) {
+    var partners = fmt(mp[i].P, '\u642D\u6863');
+    var opponents = fmt(mp[i].O, '\u5BF9\u624B');
+    if (partners || opponents) {
+      cards.push('<div class=\"partner-stat-card\"><div class=\"name\" data-player=\"' + 'M' + i + '\" onclick=\"toggleHighlight(\'' + 'M' + i + '\')\"">' + dispNamePlain('M', i) + '</div><div class=\"detail\">' + (partners ? '<div>\uD83E\uDD1D \u642D\u6863: ' + partners + '</div>' : '') + (opponents ? '<div>\uD83D\uDD25 \u5BF9\u624B: ' + opponents + '</div>' : '') + '</div></div>');
+    }
   }
-
-  for (let i = 0; i < M; i++) grid.appendChild(makeCard(nameOf('M', i), mp[i], null));
-  for (let i = 0; i < W; i++) grid.appendChild(makeCard(nameOf('W', i), wp[i], null));
+  for (var i = 0; i < W; i++) {
+    var partners = fmt(wp[i].P, '\u642D\u6863');
+    var opponents = fmt(wp[i].O, '\u5BF9\u624B');
+    if (partners || opponents) {
+      cards.push('<div class=\"partner-stat-card\"><div class=\"name\" data-player=\"' + 'W' + i + '\" onclick=\"toggleHighlight(\'' + 'W' + i + '\')\"">' + dispNamePlain('W', i) + '</div><div class=\"detail\">' + (partners ? '<div>\uD83E\uDD1D \u642D\u6863: ' + partners + '</div>' : '') + (opponents ? '<div>\uD83D\uDD25 \u5BF9\u624B: ' + opponents + '</div>' : '') + '</div></div>');
+    }
+  }
+  if (cards.length === 0) {
+    cards.push('<div class=\"partner-no-repeats\">\uD83D\uDCCB \u6240\u6709\u642D\u6863\u7EC4\u5408\u5747\u53EA\u51FA\u73B01\u6B21\uFF0C\u65E0\u91CD\u590D\u642D\u914D</div>');
+  }
+  document.getElementById('partner-stats').innerHTML = cards.join('');
 }
-
 function renderCoverage(matches, M, W) {
   const grid = document.getElementById('coverage-grid');
   const maleCombos = combinations(M);
@@ -3263,8 +4196,8 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   }
   
   // ========== Read live names from players array ==========
-  var males = players.filter(function(p){return p.gender==='\u7537';});
-  var females = players.filter(function(p){return p.gender==='\u5973';});
+  var males = players.filter(function(p){return p.gender==='男';});
+  var females = players.filter(function(p){return p.gender==='女';});
   var mLive = males.map(function(p){return p.name||'';});
   var wLive = females.map(function(p){return p.name||'';});
   
@@ -3275,7 +4208,7 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   
   // ========== Inputs ==========
   var dateRaw = document.getElementById('export-date')?.value || '';
-  var dateVal = dateRaw ? dateRaw.split('-').slice(1).reverse().join('\u6708') + '\u65E5' : '6\u670825\u65E5';
+  var dateVal = dateRaw ? dateRaw.split('-').slice(1).reverse().join('月') + '日' : '6月25日';
   var venueStart = document.getElementById('venue-start')?.value || '19:00';
   var venueEnd = document.getElementById('venue-end')?.value || '22:00';
   var venueVal = venueStart + '-' + venueEnd;
@@ -3308,7 +4241,7 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   });
   
   // Group by round
-  var typeLabel = {DB:'\u7537\u53CC', WB:'\u5973\u53CC', MX:'\u6DF7\u53CC', XW:'MX\u00D7WB', XD:'MX\u00D7DB', MB:'\u7537\u53CCvs\u5973\u53CC'};
+  var typeLabel = {DB:'男双', WB:'女双', MX:'混双', XW:'MX×WB', XD:'MX×DB', MB:'男双vs女双'};
   var groups = {};
   matches.forEach(function(m) { var rn=m[0]; if(!groups[rn]) groups[rn]=[]; groups[rn].push(m); });
   var rounds = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
@@ -3319,8 +4252,8 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   
   // ========== Create workbook ==========
   var wb = new ExcelJS.Workbook();
-  wb.creator = '\u7F51\u7403\u6392\u9635\u7CFB\u7EDF';
-  var ws = wb.addWorksheet('\u5BF9\u5C40\u5B89\u6392');
+  wb.creator = '网球排阵系统';
+  var ws = wb.addWorksheet('对局安排');
   
   // Column widths
   ws.getColumn(1).width = 14;
@@ -3331,14 +4264,14 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
     ws.getColumn(5 + ci * 3).width = 18;
   }
   
-  var fontName = '\u7B49\u7EBF';
+  var fontName = '等线';
   
   // ========== Title Row ==========
   var r1 = ws.getRow(1);
   r1.height = 45;
   ws.mergeCells(1, 1, 1, 2 + maxCourts * 3);
   var titleCell = r1.getCell(1);
-  titleCell.value = dateVal + ' \u573A\u5730\u65F6\u95F4\uFF1A' + venueVal;
+  titleCell.value = dateVal + ' 场地时间：' + venueVal;
   titleCell.font = {name: fontName, bold: true, size: 14};
   titleCell.alignment = {horizontal: 'center', vertical: 'middle'};
   
@@ -3358,14 +4291,14 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
     };
   }
   
-  var c1 = r2.getCell(1); c1.value = '\u65F6\u95F4\u6BB5'; applyHdrStyle(c1);
-  var c2 = r2.getCell(2); c2.value = '\u573A\u6B21'; applyHdrStyle(c2);
+  var c1 = r2.getCell(1); c1.value = '时间段'; applyHdrStyle(c1);
+  var c2 = r2.getCell(2); c2.value = '场次'; applyHdrStyle(c2);
   
   for (var ci = 0; ci < maxCourts; ci++) {
     var colStart = 3 + ci * 3;
     ws.mergeCells(2, colStart, 2, colStart + 2);
     var cell = r2.getCell(colStart);
-    cell.value = '\u573A\u5730' + (ci+1);
+    cell.value = '场地' + (ci+1);
     applyHdrStyle(cell);
     for (var cc = colStart + 1; cc <= colStart + 2; cc++) applyHdrStyle(r2.getCell(cc));
   }
@@ -3419,7 +4352,7 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
       typeCell.border = borderStyle;
       row2.getCell(colStart).border = borderStyle;
       
-      // Team 1 players
+      // Team 1 - row1
       var p1cell = row1.getCell(colStart + 1);
       var p2cell = row1.getCell(colStart + 2);
       var name1a = getPlayerName(m, 0, 0);
@@ -3435,7 +4368,7 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
       if (nameColors[name1a]) p1cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF' + nameColors[name1a]}};
       if (nameColors[name1b]) p2cell.fill = {type: 'pattern', pattern:'solid', fgColor:{argb:'FF' + nameColors[name1b]}};
       
-      // Team 2 players
+      // Team 2 - row2
       var p3cell = row2.getCell(colStart + 1);
       var p4cell = row2.getCell(colStart + 2);
       var name2a = getPlayerName(m, 1, 0);
@@ -3458,7 +4391,7 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
   // ========== Write file ==========
   var now = new Date();
   var ds = (now.getMonth()+1)+'-'+now.getDate()+'-'+now.getFullYear();
-  var fname = '\u7F51\u7403\u6392\u9635_' + ds + '.xlsx';
+  var fname = '网球排阵_' + ds + '.xlsx';
   
   wb.xlsx.writeBuffer().then(function(buffer) {
     var blob = new Blob([buffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -3472,143 +4405,10 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
     URL.revokeObjectURL(url);
     
     hideError();
-    document.getElementById('success-msg').textContent = '\u2705 \u5DF2\u5BFC\u51FA ' + fname;
+    document.getElementById('success-msg').textContent = '✅ 已导出 ' + fname;
     document.getElementById('success-msg').classList.add('show');
   }).catch(function(err) {
-    showError('\u5BFC\u51FA\u5931\u8D25\uFF1A' + err.message);
+    showError('导出失败：' + err.message);
   });
 }
-
-// ==================== Save / Load ====================
-var STORAGE_KEY = 'tennis_scheduler_state';
-
-function saveState() {
-  try {
-    var data = {
-      players: players,
-      date: document.getElementById('export-date')?.value,
-      venueStart: document.getElementById('venue-start')?.value,
-      venueEnd: document.getElementById('venue-end')?.value,
-      duration: document.getElementById('export-round-duration')?.value,
-      minDB: document.getElementById('min-db')?.value,
-      minWB: document.getElementById('min-wb')?.value,
-      minMX: document.getElementById('min-mx')?.value,
-      mode: getMode()
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch(e) {}
-}
-
-function fmtDate(d) {
-  var mm = String(d.getMonth()+1).padStart(2,'0');
-  var dd = String(d.getDate()).padStart(2,'0');
-  return d.getFullYear()+'-'+mm+'-'+dd;
-}
-
-function loadState() {
-  try {
-    var raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    var data = JSON.parse(raw);
-    if (data.players && data.players.length > 0) {
-      players.length = 0;
-      data.players.forEach(function(p) {
-        players.push({gender: p.gender || '\u7537', name: p.name || '', level: p.level || 3.0});
-      });
-    }
-    if (data.date) document.getElementById('export-date').value = data.date;
-    if (data.venueStart) document.getElementById('venue-start').value = data.venueStart;
-    if (data.venueEnd) document.getElementById('venue-end').value = data.venueEnd;
-    if (data.duration) document.getElementById('export-round-duration').value = data.duration;
-    if (data.minDB) document.getElementById('min-db').value = data.minDB;
-    if (data.minWB) document.getElementById('min-wb').value = data.minWB;
-    if (data.minMX) document.getElementById('min-mx').value = data.minMX;
-    if (data.mode) {
-      document.querySelectorAll('.mode-btn').forEach(function(b) {
-        b.classList.toggle('active', b.dataset.mode === data.mode);
-      });
-    }
-    renderPlayerList();
-    updateCount();
-    refreshConstraintSelects();
-    return true;
-  } catch(e) { return false; }
-}
-
-// Auto-save on change
-function autoSave() { setTimeout(saveState, 100); }
-
-// Hook into existing save points by wrapping addPlayer
-var origAddPlayer = addPlayer;
-addPlayer = function(gender, name, level) {
-  origAddPlayer(gender, name, level);
-  autoSave();
-};
-
-// Mode buttons save
-document.querySelectorAll('.mode-btn').forEach(function(btn) {
-  btn.addEventListener('click', autoSave);
-});
-
-// Reset button
-document.getElementById('reset-players-btn').addEventListener('click', function() {
-  if (!confirm('\u786E\u5B9A\u8981\u6E05\u9664\u6240\u6709\u9009\u624B\u4FE1\u606F\u5417\uFF1F')) return;
-  players.length = 0;
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  localStorage.removeItem(STORAGE_KEY);
-  hideError();
-  document.getElementById('success-msg').textContent = '\u2705 \u5DF2\u6062\u590D\u9ED8\u8BA4\u9009\u624B';
-  document.getElementById('success-msg').classList.add('show');
-  autoSave();
-});
-
-// Date/time/min inputs save
-['export-date','venue-start','venue-end','export-round-duration','min-db','min-wb','min-mx'].forEach(function(id) {
-  var el = document.getElementById(id);
-  if (el) el.addEventListener('input', autoSave);
-});
-
-window.addEventListener('beforeunload', saveState);
-
-// ==================== Init ====================
-if (!loadState()) {
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u7537', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-  addPlayer('\u5973', '', 3.0);
-}
-
-// Set default date to today if not loaded
-var dateInput = document.getElementById('export-date');
-if (dateInput && !dateInput.value) {
-  dateInput.value = fmtDate(new Date());
-}
-</script>
-
-<!-- Loading Overlay -->
-<div class="loading-overlay" id="loading-overlay">
-  <div class="loading-box">
-    <span class="icon">🎾</span>
-    <div class="loading-spinner"></div>
-    <div class="title">正在计算排阵中</div>
-    <div class="sub">
-      算法正在努力安排最佳对阵<span class="dot-1">.</span><span class="dot-2">.</span><span class="dot-3">.</span><br>
-      请耐心等待
-    </div>
-  </div>
-</div>
-
-</body>
-</html>
-
+</script></body></html>
