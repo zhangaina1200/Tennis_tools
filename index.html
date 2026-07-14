@@ -363,8 +363,71 @@
     .header h1 { font-size: 17px; }
     .round-section .match-table td { padding: 4px 6px; font-size: 11px; }
   }
-  .scroll-x { overflow-x: auto; }
-
+ .scroll-x { overflow-x: auto; }
+  
+  /* ===== Player badges for swap ===== */
+  .player-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 600;
+    border: 2px solid transparent;
+    user-select: none;
+  }
+  .player-badge:hover { background: #e8f5e9; }
+  .player-badge.selected {
+    background: #fff3cd;
+    border-color: #ffc107;
+    box-shadow: 0 0 0 2px rgba(255,193,7,0.3);
+  }
+  .player-badge.drag-over {
+    background: #c8e6c9;
+    border-color: var(--green);
+    box-shadow: 0 0 0 2px rgba(46,125,50,0.3);
+  }
+  .player-badge.dragging { opacity: 0.4; }
+  .player-badge[data-gender="M"] { color: #1565c0; }
+  .player-badge[data-gender="W"] { color: #e91e63; }
+  .player-badge.sel-source { background: #bbdefb; border-color: #1565c0; }
+  .player-badge.sel-target { background: #fff3cd; border-color: #ffc107; }
+  
+  /* ===== Swap confirmation modal ===== */
+  .swap-modal-overlay {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 9998;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(2px);
+  }
+  .swap-modal-overlay.show { display: flex; }
+  .swap-modal-box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px 36px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    max-width: 440px;
+    width: 92%;
+  }
+  .swap-modal-box h3 { font-size: 18px; margin-bottom: 12px; color: var(--green-dark); }
+  .swap-modal-box .swap-info { font-size: 14px; color: #333; margin-bottom: 14px; line-height: 1.6; }
+  .swap-modal-box .swap-info .arrow { color: var(--green); font-weight: 600; margin: 0 4px; }
+  .swap-violations { margin: 12px 0; padding: 12px 14px; background: #fff3e0; border-radius: 8px; border-left: 4px solid var(--orange); }
+  .swap-violations .v-title { font-size: 13px; font-weight: 600; color: #bf360c; margin-bottom: 6px; }
+  .swap-violations .v-item { font-size: 13px; color: #e65100; padding: 2px 0; }
+  .swap-violations .v-item::before { content: '⚠️ '; }
+  .swap-no-violations { margin: 12px 0; padding: 10px 14px; background: #e8f5e9; border-radius: 8px; font-size: 13px; color: #1b5e20; }
+  .swap-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .swap-modal-actions button { padding: 8px 22px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500; transition: opacity 0.2s; }
+  .swap-modal-actions .btn-cancel { background: #e0e0e0; color: #555; }
+  .swap-modal-actions .btn-cancel:hover { background: #bdbdbd; }
+  .swap-modal-actions .btn-confirm { background: var(--green); color: #fff; }
+  .swap-modal-actions .btn-confirm:hover { opacity: 0.85; }
+  .swap-modal-actions .btn-confirm.violations { background: var(--orange); }
+ 
   /* Loading Overlay */
   .loading-overlay {
     display: none;
@@ -641,9 +704,22 @@
       <div class="loading-spinner"></div>
       <div class="loading-text">正在计算…</div>
     </div>
+ </div>
+
+  <!-- Swap confirmation modal -->
+  <div class="swap-modal-overlay" id="swap-modal">
+    <div class="swap-modal-box">
+      <h3 id="swap-modal-title">🔄 交换确认</h3>
+      <div class="swap-info" id="swap-modal-info"></div>
+      <div id="swap-modal-violations"></div>
+      <div class="swap-modal-actions">
+        <button class="btn-cancel" id="swap-cancel-btn">取消</button>
+        <button class="btn-confirm" id="swap-confirm-btn">确认生效</button>
+      </div>
+    </div>
   </div>
 
-  <!-- Result Section -->
+ <!-- Result Section -->
   <div id="result">
     <div class="card">
       <h2>📋 排阵结果 <span id="relax-badge"></span></h2>
@@ -1307,9 +1383,9 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         if (pat === 'MWWW' || pat === 'WMWW' || pat === 'WWMW') {
           // Find which player is the man
           let mxM, mxW, wb0, wb1;
-          if (pat[0] === 'M') { mxM = fc.a; mxW = fc.b; wb0 = fc.c; wb1 = fc.d; }
-          else if (pat[1] === 'M') { mxM = fc.b; mxW = fc.a; wb0 = fc.c; wb1 = fc.d; }
-          else if (pat[2] === 'M') { mxM = fc.c; mxW = fc.d; wb0 = fc.a; wb1 = fc.b; }
+          if (pat[0] === 'C') { mxM = fc.a; mxW = fc.b; wb0 = fc.c; wb1 = fc.d; }
+          else if (pat[1] === 'C') { mxM = fc.b; mxW = fc.a; wb0 = fc.c; wb1 = fc.d; }
+          else if (pat[2] === 'C') { mxM = fc.c; mxW = fc.d; wb0 = fc.a; wb1 = fc.b; }
           else { mxM = fc.d; mxW = fc.c; wb0 = fc.a; wb1 = fc.b; }
           fromFixed = { mxM, mxW, wb0, wb1 };
           fixedRemaining.splice(fi, 1);
@@ -1338,7 +1414,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
           var _rc = fixedRemaining[_ri];
           for (var _pi = 0; _pi < 4; _pi++) {
             var _p = [_rc.a, _rc.b, _rc.c, _rc.d][_pi];
-            if (_rc.genders[_pi] === 'M') { if (_reservedMX.indexOf(_p) < 0) _reservedMX.push(_p); }
+            if (_rc.genders[_pi] === 'C') { if (_reservedMX.indexOf(_p) < 0) _reservedMX.push(_p); }
             else { if (_reservedWX.indexOf(_p) < 0) _reservedWX.push(_p); }
           }
         }
@@ -1427,7 +1503,7 @@ function _go(M, W, dist, isUniform, pairCons, mixedCons, fixedCons, relax, N, ma
         }
       }
       // Ensure constraint pair participants are in chosen
-      const dbPairCons = pairCons.filter(pc => pc.gender === 'M');
+      const dbPairCons = pairCons.filter(pc => pc.gender === 'C');
       const neededForPair = new Set();
       for (const pc of dbPairCons) {
         const pk = pc.p1 + ',' + pc.p2;
@@ -2858,11 +2934,18 @@ let pairConstraints = [];
 let fixedConstraints = [];
 
 function nameOf(gender, idx) {
-  var arr = gender === 'M' ? (typeof maleNames !== 'undefined' && maleNames.length > idx ? maleNames : null) : (typeof femaleNames !== 'undefined' && femaleNames.length > idx ? femaleNames : null);
-  if (!arr) {
-    arr = gender === 'M' ? players.filter(function(p){return p.gender==='\u7537';}).map(function(p){return p.name||'';}) : players.filter(function(p){return p.gender==='\u5973';}).map(function(p){return p.name||'';});
+  var arr;
+  if (gender === 'M') {
+    arr = (typeof maleNames !== 'undefined' && maleNames.length > idx ? maleNames : null);
+    if (!arr) { arr = players.filter(function(p){return p.gender==='\u7537';}).map(function(p){return p.name||'';}); }
+    return arr[idx] || 'M' + (idx + 1);
+  } else if (gender === 'W') {
+    arr = (typeof femaleNames !== 'undefined' && femaleNames.length > idx ? femaleNames : null);
+    if (!arr) { arr = players.filter(function(p){return p.gender==='\u5973';}).map(function(p){return p.name||'';}); }
+    return arr[idx] || 'W' + (idx + 1);
+  } else {
+    return "第" + (idx + 1) + "位选手";
   }
-  return arr[idx] || (gender === 'M' ? 'M' + (idx + 1) : 'W' + (idx + 1));
 }
 
 function dispName(gender, idx, showLevel) {
@@ -3156,6 +3239,242 @@ function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, s
   renderCoverage(matches, M, W);
 }
 
+
+﻿// ==================== Player swap mechanism ====================
+let _swapSelected = null;
+let _isDragging = false;
+
+// makeBadge is defined inline in renderAllRounds, this is a reference
+
+function getPlayerFromBadge(el) {
+  return { gender: el.dataset.gender, player: parseInt(el.dataset.player), round: parseInt(el.dataset.round), court: parseInt(el.dataset.court), team: parseInt(el.dataset.team), pos: parseInt(el.dataset.pos) };
+}
+
+function computeRels(matches) {
+  var partners = {}, opponents = {}, playerRounds = {};
+  function incMap(map, a, b, g) { var key = g + Math.min(a,b) + "," + g + Math.max(a,b); map[key] = (map[key] || 0) + 1; }
+  function addRound(key, rnd) { if (!playerRounds[key]) playerRounds[key] = {}; playerRounds[key][rnd] = true; }
+  for (var mi = 0; mi < matches.length; mi++) {
+    var m = matches[mi], rnd = m[0], type = m[1], t1 = m[2], t2 = m[3];
+    if (type === "DB") {
+      addRound("M"+t1[0], rnd); addRound("M"+t1[1], rnd); addRound("M"+t2[0], rnd); addRound("M"+t2[1], rnd);
+      incMap(partners, t1[0], t1[1], 'M'); incMap(partners, t2[0], t2[1], 'M');
+      for (var a = 0; a < 2; a++) for (var b = 0; b < 2; b++) incMap(opponents, t1[a], t2[b], 'M');
+    } else if (type === "WB") {
+      addRound("W"+t1[0], rnd); addRound("W"+t1[1], rnd); addRound("W"+t2[0], rnd); addRound("W"+t2[1], rnd);
+      incMap(partners, t1[0], t1[1], 'W'); incMap(partners, t2[0], t2[1], 'W');
+      for (var a = 0; a < 2; a++) for (var b = 0; b < 2; b++) incMap(opponents, t1[a], t2[b], 'W');
+    } else if (type === "MX") {
+      addRound("M"+t1[0], rnd); addRound("M"+t2[0], rnd); addRound("W"+t1[1], rnd); addRound("W"+t2[1], rnd);
+      incMap(opponents, t1[0], t2[0], 'M'); incMap(opponents, t1[1], t2[1], 'W');
+    } else if (type === "XW") {
+      addRound("M"+t1[0], rnd); addRound("W"+t1[1], rnd); addRound("W"+t2[0], rnd); addRound("W"+t2[1], rnd);
+    } else if (type === "XD") {
+      addRound("M"+t1[0], rnd); addRound("W"+t1[1], rnd); addRound("M"+t2[0], rnd); addRound("M"+t2[1], rnd);
+    } else if (type === "MB") {
+      addRound("M"+t1[0], rnd); addRound("M"+t1[1], rnd); addRound("W"+t2[0], rnd); addRound("W"+t2[1], rnd);
+      incMap(partners, t1[0], t1[1], 'M'); incMap(partners, t2[0], t2[1], 'W');
+    }
+  }
+  return { partners: partners, opponents: opponents, playerRounds: playerRounds };
+}
+
+function addSeen(seen, gender, idx) { var key = gender + idx; seen[key] = (seen[key] || 0) + 1; }
+
+function getViolationsAfterSwap(matches, sel1, sel2) {
+  try {
+  var clone = JSON.parse(JSON.stringify(matches));
+  var found1 = null, found2 = null;
+  for (var i = 0; i < clone.length; i++) {
+    if (clone[i][0] !== sel1.round) continue;
+    var inRound = []; for (var j = 0; j < clone.length; j++) if (clone[j][0] === sel1.round) inRound.push(j);
+    if (inRound.indexOf(i) === sel1.court) { found1 = clone[i]; break; }
+  }
+  for (var i = 0; i < clone.length; i++) {
+    if (clone[i][0] !== sel2.round) continue;
+    var inRound2 = []; for (var j = 0; j < clone.length; j++) if (clone[j][0] === sel2.round) inRound2.push(j);
+    if (inRound2.indexOf(i) === sel2.court) { found2 = clone[i]; break; }
+  }
+  if (!found1 || !found2) return { violations: [], ok: false };
+
+  var val1 = found1[sel1.team+2][sel1.pos];
+  var val2 = found2[sel2.team+2][sel2.pos];
+  found1[sel1.team+2][sel1.pos] = val2;
+  found2[sel2.team+2][sel2.pos] = val1;
+
+  var origRels = computeRels(matches);
+  var newRels = computeRels(clone);
+  var violations = [];
+
+  for (var pk in newRels.partners) {
+    var newCnt = newRels.partners[pk];
+    var oldCnt = origRels.partners[pk] || 0;
+    if (newCnt > 1 && newCnt > oldCnt) {
+      var parts = pk.split(",");
+      violations.push(dispNamePlain(parts[0][0], parseInt(parts[0].substring(1))) + " 与 " + dispNamePlain(parts[1][0], parseInt(parts[1].substring(1))) + " 搭档重复 (" + newCnt + "次)");
+    }
+  }
+
+  for (var ok in newRels.opponents) {
+    var newCnt = newRels.opponents[ok];
+    var oldCnt = origRels.opponents[ok] || 0;
+    if (newCnt > 2 && newCnt > oldCnt) {
+      var op = ok.split(",");
+      violations.push(dispNamePlain(op[0][0], parseInt(op[0].substring(1))) + " 与 " + dispNamePlain(op[1][0], parseInt(op[1].substring(1))) + " 对阵过多 (" + newCnt + "次)");
+    }
+  }
+
+  return { violations: violations, ok: true, clone: clone };
+  } catch(e) {
+    return { violations: [], ok: false, msg: "\u8ba1\u7b97\u51fa\u9519\uff01" + e.message };
+  }
+}function togglePlayerBadge(el) {
+  var info = getPlayerFromBadge(el);
+  if (!_swapSelected) { _swapSelected = info; refreshBadgeSelection(); return; }
+  var first = _swapSelected;
+  if (first.player === info.player && first.gender === info.gender && first.round === info.round && first.court === info.court && first.team === info.team && first.pos === info.pos) {
+    _swapSelected = null; refreshBadgeSelection(); return;
+  }
+  if (first.gender !== info.gender) { showError("只能交换同性别选手"); _swapSelected = null; refreshBadgeSelection(); return; }
+  if (first.round !== info.round) { showError("目前仅支持同轮次内交换"); _swapSelected = null; refreshBadgeSelection(); return; }
+  if (!lastGenState || !lastGenState.matches) { _swapSelected = null; refreshBadgeSelection(); return; }
+  showSwapModal(first, info);
+  _swapSelected = null; refreshBadgeSelection();
+}
+
+function refreshBadgeSelection() {
+  document.querySelectorAll(".player-badge").forEach(function(el) { el.classList.remove("sel-source", "sel-target"); });
+  if (!_swapSelected) return;
+  var sel = _swapSelected;
+  document.querySelectorAll(".player-badge").forEach(function(el) {
+    if (parseInt(el.dataset.player) === sel.player && el.dataset.gender === sel.gender &&
+        parseInt(el.dataset.round) === sel.round && parseInt(el.dataset.court) === sel.court &&
+        parseInt(el.dataset.team) === sel.team && parseInt(el.dataset.pos) === sel.pos) {
+      el.classList.add("sel-source");
+    }
+  });
+}
+
+function showSwapModal(sel1, sel2) {
+  var n1 = dispNamePlain(sel1.gender, sel1.player), n2 = dispNamePlain(sel2.gender, sel2.player);
+  document.getElementById("swap-modal-info").innerHTML = "<span class=\"gen-" + sel1.gender.toLowerCase() + "\">" + n1 + "</span> \u21c4 <span class=\"gen-" + sel2.gender.toLowerCase() + "\">" + n2 + "</span><br><small style=\"color:var(--gray);\">\u7b2c" + sel1.round + "\u8f6e \u00b7 " + (sel1.court + 1) + "\u53f7\u573a</small>";
+  var result = getViolationsAfterSwap(lastGenState.matches, sel1, sel2);
+  var vDiv = document.getElementById("swap-modal-violations");
+  if (!result.ok) {
+    vDiv.innerHTML = "<div class=\"swap-no-violations\">" + result.msg + "</div>";
+    document.getElementById("swap-confirm-btn").disabled = true;
+  } else if (result.violations.length === 0) {
+    vDiv.innerHTML = "<div class=\"swap-no-violations\">\u2705 \u65e0\u7ea6\u675f\u51b2\u7a81</div>";
+    document.getElementById("swap-confirm-btn").disabled = false;
+    document.getElementById("swap-confirm-btn").className = "btn-confirm";
+    document.getElementById("swap-confirm-btn").onclick = function() { executeSwap(sel1, sel2, result.clone); };
+  } else {
+    var html = "<div class=\"swap-violations\"><div class=\"v-title\">\u4ee5\u4e0b\u7ea6\u675f\u5c06\u88ab\u8fdd\u53cd\uff1a</div>";
+    for (var vi = 0; vi < result.violations.length; vi++) html += "<div class=\"v-item\">" + result.violations[vi] + "</div>";
+    html += "</div>"; vDiv.innerHTML = html;
+    document.getElementById("swap-confirm-btn").disabled = false;
+    document.getElementById("swap-confirm-btn").className = "btn-confirm violations";
+    document.getElementById("swap-confirm-btn").onclick = function() { executeSwap(sel1, sel2, result.clone); };
+  }
+  document.getElementById("swap-modal").classList.add("show");
+}
+
+function executeSwap(sel1, sel2, newMatches) {
+  document.getElementById("swap-modal").classList.remove("show");
+  if (!lastGenState) return;
+  lastGenState.matches = newMatches;
+  var N = lastGenState.rounds || currentRoundCount;
+  renderAllRounds(newMatches, N);
+  renderPartnerStats(newMatches, lastGenState.M, lastGenState.W);
+  renderCoverage(newMatches, lastGenState.M, lastGenState.W);
+  rebuildUsedSets();
+  showSuccess("\u2705 \u4ea4\u6362\u5df2\u751f\u6548");
+}
+
+function rebuildUsedSets() {
+  if (!lastGenState || !lastGenState.matches) return;
+  var M = lastGenState.M, W = lastGenState.W;
+  lastGenState.usedDB = new Set(); lastGenState.usedWB = new Set(); lastGenState.usedMX = new Set();
+  lastGenState.mc = new Array(M).fill(0); lastGenState.fc = new Array(W).fill(0);
+  for (var rm of lastGenState.matches) {
+    var rt = rm[1], r1 = rm[2], r2 = rm[3];
+    if (rt === "DB") {
+      lastGenState.usedDB.add(Math.min(...r1)+","+Math.max(...r1)); lastGenState.usedDB.add(Math.min(...r2)+","+Math.max(...r2));
+      for (var rp of [...r1, ...r2]) lastGenState.mc[rp]++;
+    } else if (rt === "WB") {
+      lastGenState.usedWB.add(Math.min(...r1)+","+Math.max(...r1)); lastGenState.usedWB.add(Math.min(...r2)+","+Math.max(...r2));
+      for (var rp of [...r1, ...r2]) lastGenState.fc[rp]++;
+    } else if (rt === "MX") {
+      lastGenState.usedMX.add(r1[0]+","+r1[1]); lastGenState.usedMX.add(r2[0]+","+r2[1]);
+      lastGenState.mc[r1[0]]++; lastGenState.mc[r2[0]]++; lastGenState.fc[r1[1]]++; lastGenState.fc[r2[1]]++;
+    } else if (rt === "XW") {
+      lastGenState.mc[r1[0]]++; lastGenState.fc[r1[1]]++; lastGenState.fc[r2[0]]++; lastGenState.fc[r2[1]]++;
+    } else if (rt === "XD") {
+      lastGenState.mc[r1[0]]++; lastGenState.mc[r2[0]]++; lastGenState.mc[r2[1]]++; lastGenState.fc[r1[1]]++;
+    } else if (rt === "MB") {
+      for (var rp of [...r1]) lastGenState.mc[rp]++; for (var rp of [...r2]) lastGenState.fc[rp]++;
+      lastGenState.usedDB.add(Math.min(...r1)+","+Math.max(...r1)); lastGenState.usedWB.add(Math.min(...r2)+","+Math.max(...r2));
+    }
+  }
+}
+
+function showSuccess(msg) {
+  var el = document.getElementById("success-msg");
+  el.textContent = msg; el.classList.add("show");
+  setTimeout(function() { el.classList.remove("show"); }, 3000);
+}
+
+// ==================== Badge click/drag event delegation ====================
+document.addEventListener("click", function(e) {
+  var badge = e.target.closest(".player-badge");
+  if (badge && !_isDragging) { e.preventDefault(); togglePlayerBadge(badge); }
+});
+document.addEventListener("dragstart", function(e) {
+  var badge = e.target.closest(".player-badge");
+  if (badge) { _isDragging = true; badge.classList.add("dragging"); e.dataTransfer.setData("text/plain", JSON.stringify(getPlayerFromBadge(badge))); }
+});
+document.addEventListener("dragend", function(e) {
+  var badge = e.target.closest(".player-badge");
+  if (badge) _isDragging = false; badge.classList.remove("dragging");
+  document.querySelectorAll(".player-badge.drag-over").forEach(function(el) { el.classList.remove("drag-over"); });
+});
+document.addEventListener("dragover", function(e) {
+  var badge = e.target.closest(".player-badge");
+  if (badge) { e.preventDefault(); badge.classList.add("drag-over"); }
+});
+document.addEventListener("dragleave", function(e) {
+  var badge = e.target.closest(".player-badge");
+  if (badge) badge.classList.remove("drag-over");
+});
+document.addEventListener("drop", function(e) {
+  e.preventDefault();
+  document.querySelectorAll(".player-badge.drag-over").forEach(function(el) { el.classList.remove("drag-over"); });
+  var target = e.target.closest(".player-badge"), srcData = e.dataTransfer.getData("text/plain");
+  if (!target || !srcData) return;
+  try {
+    var srcInfo = JSON.parse(srcData), tgtInfo = getPlayerFromBadge(target);
+    if (srcInfo.gender !== tgtInfo.gender) { showError("只能交换同性别选手"); return; }
+    if (srcInfo.round !== tgtInfo.round) { showError("目前仅支持同轮次内交换"); return; }
+    if (srcInfo.player === tgtInfo.player && srcInfo.round === tgtInfo.round && srcInfo.court === tgtInfo.court) return;
+    if (!lastGenState || !lastGenState.matches) return;
+    showSwapModal(srcInfo, tgtInfo);
+  } catch(ex) {}
+});
+document.getElementById("swap-cancel-btn").addEventListener("click", function() {
+  document.getElementById("swap-modal").classList.remove("show");
+});
+document.getElementById("swap-modal").addEventListener("click", function(e) {
+  if (e.target === this) this.classList.remove("show");
+});
+
+
+function makeBadge(gender, idx, round, court, team, pos) {
+  var name = dispNamePlain(gender, idx);
+  return '<span class="player-badge" draggable="true" data-gender="' + gender + '" data-player="' + idx + '" data-round="' + round + '" data-court="' + court + '" data-team="' + team + '" data-pos="' + pos + '">' + name + '</span>';
+}
+
+
+
 function renderAllRounds(matches, N) {
   const container = document.getElementById('all-rounds-container');
   container.innerHTML = '';
@@ -3227,37 +3546,37 @@ function renderAllRounds(matches, N) {
         const [round, type, t1, t2, constrained, lvlWarn] = m;
         let team1Str, team2Str;
         let lv1 = 0, lv2 = 0;
-        if (type === 'DB') {
-          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('M', t1[1], true);
-          team2Str = dispName('M', t2[0], true) + ' + ' + dispName('M', t2[1], true);
-          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
-          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
-        } else if (type === 'WB') {
-          team1Str = dispName('W', t1[0], true) + ' + ' + dispName('W', t1[1], true);
-          team2Str = dispName('W', t2[0], true) + ' + ' + dispName('W', t2[1], true);
-          lv1 = levelOf('W', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
-        } else if (type === 'XW') {
-          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('W', t1[1], true);
-          team2Str = dispName('W', t2[0], true) + ' + ' + dispName('W', t2[1], true);
-          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
-        } else if (type === 'XD') {
-          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('W', t1[1], true);
-          team2Str = dispName('M', t2[0], true) + ' + ' + dispName('M', t2[1], true);
-          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
-        } else if (type === 'MB') {
-          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('M', t1[1], true);
-          team2Str = dispName('W', t2[0], true) + ' + ' + dispName('W', t2[1], true);
-          lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
-          lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
-        } else {
-          team1Str = dispName('M', t1[0], true) + ' + ' + dispName('W', t1[1], true);
-          team2Str = dispName('M', t2[0], true) + ' + ' + dispName('W', t2[1], true);
-          lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
-          lv2 = levelOf('M', t2[0]) + levelOf('W', t2[1]);
-        }
+       if (type === 'DB') {
+          team1Str = makeBadge('M', t1[0], r+1, i, 0, 0) + ' + ' + makeBadge('M', t1[1], r+1, i, 0, 1);
+          team2Str = makeBadge('M', t2[0], r+1, i, 1, 0) + ' + ' + makeBadge('M', t2[1], r+1, i, 1, 1);
+         lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
+         lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
+       } else if (type === 'WB') {
+          team1Str = makeBadge('W', t1[0], r+1, i, 0, 0) + ' + ' + makeBadge('W', t1[1], r+1, i, 0, 1);
+          team2Str = makeBadge('W', t2[0], r+1, i, 1, 0) + ' + ' + makeBadge('W', t2[1], r+1, i, 1, 1);
+         lv1 = levelOf('W', t1[0]) + levelOf('W', t1[1]);
+         lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+       } else if (type === 'XW') {
+          team1Str = makeBadge('M', t1[0], r+1, i, 0, 0) + ' + ' + makeBadge('W', t1[1], r+1, i, 0, 1);
+          team2Str = makeBadge('W', t2[0], r+1, i, 1, 0) + ' + ' + makeBadge('W', t2[1], r+1, i, 1, 1);
+         lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+         lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+       } else if (type === 'XD') {
+          team1Str = makeBadge('M', t1[0], r+1, i, 0, 0) + ' + ' + makeBadge('W', t1[1], r+1, i, 0, 1);
+          team2Str = makeBadge('M', t2[0], r+1, i, 1, 0) + ' + ' + makeBadge('M', t2[1], r+1, i, 1, 1);
+         lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+         lv2 = levelOf('M', t2[0]) + levelOf('M', t2[1]);
+       } else if (type === 'MB') {
+          team1Str = makeBadge('M', t1[0], r+1, i, 0, 0) + ' + ' + makeBadge('M', t1[1], r+1, i, 0, 1);
+          team2Str = makeBadge('W', t2[0], r+1, i, 1, 0) + ' + ' + makeBadge('W', t2[1], r+1, i, 1, 1);
+         lv1 = levelOf('M', t1[0]) + levelOf('M', t1[1]);
+         lv2 = levelOf('W', t2[0]) + levelOf('W', t2[1]);
+       } else {
+          team1Str = makeBadge('M', t1[0], r+1, i, 0, 0) + ' + ' + makeBadge('W', t1[1], r+1, i, 0, 1);
+          team2Str = makeBadge('M', t2[0], r+1, i, 1, 0) + ' + ' + makeBadge('W', t2[1], r+1, i, 1, 1);
+         lv1 = levelOf('M', t1[0]) + levelOf('W', t1[1]);
+         lv2 = levelOf('M', t2[0]) + levelOf('W', t2[1]);
+       }
         const diff = Math.abs(lv1 - lv2);
         let diffIcon = '⚔️ ';
         if (diff > 0.5) diffIcon = '⚡ ';
@@ -3297,6 +3616,10 @@ function swapRounds(fromIdx, toIdx, matches, N) {
   }
 
   renderAllRounds(matches, N);
+  if (lastGenState) {
+    renderPartnerStats(matches, lastGenState.M, lastGenState.W);
+    renderCoverage(matches, lastGenState.M, lastGenState.W);
+  }
 
   let dbC = 0, wbC = 0, mxC = 0;
   for (const m of matches) {
@@ -3365,6 +3688,10 @@ function deleteRound(r, matches, N) {
   document.getElementById('round-counter').textContent = newN + '/' + MAX_ROUNDS;
   document.getElementById('add-round-btn').style.display = newN < MAX_ROUNDS ? 'inline-block' : 'none';
   renderAllRounds(newMatches, newN);
+  if (lastGenState) {
+    renderPartnerStats(newMatches, lastGenState.M, lastGenState.W);
+    renderCoverage(newMatches, lastGenState.M, lastGenState.W);
+  }
 }
 
 // ===== Constraint UI =====
@@ -3933,36 +4260,52 @@ function renderPartnerStats(matches, M, W) {
 function renderCoverage(matches, M, W) {
   const grid = document.getElementById('coverage-grid');
   const maleCombos = combinations(M);
-  const maleActual = new Set();
+  const maleMet = new Set();
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'DB') {
-      for (const a of t1) for (const b of t2) maleActual.add(Math.min(a,b)+','+Math.max(a,b));
+      maleMet.add(Math.min(t1[0],t1[1])+','+Math.max(t1[0],t1[1]));
+      maleMet.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
+      for (const a of t1) for (const b of t2) maleMet.add(Math.min(a,b)+','+Math.max(a,b));
     } else if (type === 'MX') {
-      maleActual.add(Math.min(t1[0],t2[0])+','+Math.max(t1[0],t2[0]));
+      maleMet.add(Math.min(t1[0],t2[0])+','+Math.max(t1[0],t2[0]));
     } else if (type === 'XD') {
-      maleActual.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
+      maleMet.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
+      maleMet.add(Math.min(t1[0],t2[0])+','+Math.max(t1[0],t2[0]));
+      maleMet.add(Math.min(t1[0],t2[1])+','+Math.max(t1[0],t2[1]));
+    } else if (type === 'MB') {
+      maleMet.add(Math.min(t1[0],t1[1])+','+Math.max(t1[0],t1[1]));
     }
   }
-  const mcTotal = maleCombos.length, mcActual = maleActual.size;
-  const mcMissing = maleCombos.filter(([a,b]) => !maleActual.has(a+','+b)).map(([a,b]) => nameOf('M',a)+' vs '+nameOf('M',b));
+  const mcTotal = maleCombos.length, mcActual = maleMet.size;
+  const mcMissing = maleCombos.filter(([a,b]) => !maleMet.has(a+','+b)).map(([a,b]) => nameOf('M',a)+' vs '+nameOf('M',b));
 
   const femaleCombos = combinations(W);
-  const femaleActual = new Set();
+  const femaleMet = new Set();
   for (const m of matches) {
     const [r, type, t1, t2] = m;
     if (type === 'WB') {
-      for (const a of t1) for (const b of t2) femaleActual.add(Math.min(a,b)+','+Math.max(a,b));
+      femaleMet.add(Math.min(t1[0],t1[1])+','+Math.max(t1[0],t1[1]));
+      femaleMet.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
+      for (const a of t1) for (const b of t2) femaleMet.add(Math.min(a,b)+','+Math.max(a,b));
     } else if (type === 'MX') {
-      femaleActual.add(Math.min(t1[1],t2[1])+','+Math.max(t1[1],t2[1]));
+      femaleMet.add(Math.min(t1[1],t2[1])+','+Math.max(t1[1],t2[1]));
     } else if (type === 'XW') {
-      femaleActual.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
+      femaleMet.add(Math.min(t1[1],t2[0])+','+Math.max(t1[1],t2[0]));
+      femaleMet.add(Math.min(t1[1],t2[1])+','+Math.max(t1[1],t2[1]));
+      femaleMet.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
+    } else if (type === 'MB') {
+      femaleMet.add(Math.min(t2[0],t2[1])+','+Math.max(t2[0],t2[1]));
     }
   }
-  const fcTotal = femaleCombos.length, fcActual = femaleActual.size;
-  const fcMissing = femaleCombos.filter(([a,b]) => !femaleActual.has(a+','+b)).map(([a,b]) => nameOf('W',a)+' vs '+nameOf('W',b));
+  const fcTotal = femaleCombos.length, fcActual = femaleMet.size;
+  const fcMissing = femaleCombos.filter(([a,b]) => !femaleMet.has(a+','+b)).map(([a,b]) => nameOf('W',a)+' vs '+nameOf('W',b));
 
-  grid.innerHTML = `
+  
+  void 0 // crossMissing = [];
+
+
+grid.innerHTML = `
     <div class="cov-box"><h3>🏸 男选手对阵</h3>
       <div class="stat ${mcActual === mcTotal ? '' : 'warn'}">${mcActual} / ${mcTotal}</div>
       <div class="sub">${mcActual === mcTotal ? '✅ 全对阵!' : '⚡ 已对阵 ' + mcActual + ' 组'}</div>
@@ -3972,7 +4315,8 @@ function renderCoverage(matches, M, W) {
       <div class="stat ${fcActual === fcTotal ? '' : 'warn'}">${fcActual} / ${fcTotal}</div>
       <div class="sub">${fcActual === fcTotal ? '✅ 全对阵!' : '⚡ 已对阵 ' + fcActual + ' 组'}</div>
       ${fcMissing.length > 0 ? '<div class="missing">❌ 缺失 ' + fcMissing.length + ' 组:' + fcMissing.join('、') + '</div>' : '<div class="missing" style="color:var(--green)">🎉 完美覆盖!</div>'}
-    </div>`;
+    </div>
+      </div>`;
 }
 
 // ==================== Help toggle ====================
