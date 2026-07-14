@@ -3435,7 +3435,7 @@ document.addEventListener("dragstart", function(e) {
 });
 document.addEventListener("dragend", function(e) {
   var badge = e.target.closest(".player-badge");
-  if (badge) _isDragging = false; badge.classList.remove("dragging");
+  if (badge) { badge.classList.remove("dragging"); setTimeout(function() { _isDragging = false; }, 50); }
   document.querySelectorAll(".player-badge.drag-over").forEach(function(el) { el.classList.remove("drag-over"); });
 });
 document.addEventListener("dragover", function(e) {
