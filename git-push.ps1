@@ -12,7 +12,7 @@ if (-not $status) {
 }
 Write-Host $status -ForegroundColor White
 
-# 2. Message
+# 2. Commit message
 if (-not $Message) {
     $changed = @()
     $status -split "`n" | ForEach-Object {
@@ -41,11 +41,21 @@ Write-Host "Staged: index.html, .gitignore, git-push.ps1"
 Write-Host "`n=== Committing ===" -ForegroundColor Cyan
 git commit -m $Message 2>$null
 
-# 6. Push (with 5s timeout for low-speed detection)
+# 6. Push (check network first)
 Write-Host "`n=== Pushing ===" -ForegroundColor Cyan
-git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=5 push origin master 2>$null
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "`nOK - pushed!" -ForegroundColor Green
-} else {
-    Write-Host "`nNetwork unavailable. Run: git push origin master" -ForegroundColor Yellow
+try {
+    $tcp = New-Object System.Net.Sockets.TcpClient
+    $ar = $tcp.BeginConnect("github.com", 443, $null, $null)
+    $ar.AsyncWaitHandle.WaitOne(3000) | Out-Null
+    if ($tcp.Connected) {
+        $tcp.EndConnect($ar) | Out-Null
+        $tcp.Close()
+        git push origin master 2>$null
+        Write-Host "OK - pushed!" -ForegroundColor Green
+    } else {
+        $tcp.Close()
+        Write-Host "Network blocked. Run: git push origin master" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "Network blocked. Run: git push origin master" -ForegroundColor Yellow
 }

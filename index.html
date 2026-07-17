@@ -2580,6 +2580,7 @@ function generate(M, W, tries, constraints, relax, N, minDB, minWB, minMX) {
   if (allDists.length === 0) { console.log('generate: no dist candidates'); return null; }
   const { candidates: filteredCands, exact: exactMatch, suggestion } = filterByMinRequirements(allDists, minDB, minWB, minMX);
   if (filteredCands.length === 0) { console.log('generate: no filtered cands'); return null; }
+  _fbS(filteredCands);
   const sorted = sortDistsByMode(filteredCands, mode, N);
 
   // Prepare constraints
