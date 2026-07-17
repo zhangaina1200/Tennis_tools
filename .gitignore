@@ -30,3 +30,10 @@ analysis.txt
 verify_result.txt
 test_perms.txt
 read_xlsx.py
+
+# Temp fix scripts
+fix_*.py
+fix_*.txt
+todo.md
+_debug_*.*
+*.xlsx

@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+
+ <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -28,7 +29,7 @@
     line-height: 1.6;
     padding: 20px;
   }
-  .container { max-width: 960px; margin: 0 auto; }
+  .container { max-width: 1440px; margin: 0 auto; }
 
   .header {
     text-align: center;
@@ -294,6 +295,16 @@
   input[type="number"]::-webkit-inner-spin-button { opacity: 0.5; }
   
   /* ===== Responsive: Mobile ===== */
+  @media (min-width: 1100px) {
+    .wide-layout { display: flex; gap: 20px; align-items: flex-start; }
+    .wide-layout .col-result { flex: 2; min-width: 0; }
+    .wide-layout .col-partner,
+    .wide-layout .col-coverage { flex: 1; min-width: 0; }
+    .wide-layout .col-result > .card,
+    .wide-layout .col-partner > .card,
+    .wide-layout .col-coverage > .card { padding: 20px 16px; }
+  }
+
   @media (max-width: 640px) {
     body { padding: 10px; }
     .card { padding: 14px 12px; }
@@ -570,8 +581,8 @@
           ⚡ 条件:男女人数均为偶数 · 总人数为4的倍数 · 零重复搭档
         </div>
       </div>
-    </div>
   </div>
+</div>
 
   <!-- Input Section -->
   <div class="card">
@@ -716,9 +727,14 @@
 
  <!-- Result Section -->
   <div id="result">
-    <div class="card">
+    <div class="wide-layout">
+  <div class="col-result">
+  <div class="card">
       <h2>📋 排阵结果 <span id="relax-badge"></span></h2>
       <div class="summary-line" id="summary-line"></div>
+      <div style="min-height: 32px; margin: 2px 0;" id="result-actions">
+        <button id="undo-btn" class="btn btn-sm" style="background:var(--orange);color:#fff;display:none;" onclick="undoSwap()" title="撤销上一次交换">↩ 撤销</button>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:13px;color:var(--gray);">共</span>
         <span id="round-counter" style="font-size:14px;font-weight:600;color:var(--green);"></span>
@@ -727,24 +743,37 @@
         <span style="font-size:11px;color:var(--gray);margin-left:8px;">↕ 拖拽轮次标题可调整顺序</span>
       </div>
       <div id="all-rounds-container" style="overflow-x:auto;"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
-        <div class="seed-info" id="seed-info"></div>
-        <button class="btn btn-sm btn-generate" id="export-btn" style="font-size:12px;padding:5px 14px;">📥 导出Excel</button>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:space-between;">
+        <span class="seed-info" id="seed-info"></span>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="text" id="scheme-name" placeholder="方案名称" style="padding:6px 10px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;width:100px;">
+        <button class="btn-save" onclick="saveScheme()" style="font-size:12px;padding:5px 10px;">📋 保存方案</button>
+        <button class="btn btn-sm btn-generate" id="export-btn" style="font-size:12px;padding:5px 14px;min-width:105px;">📥 导出Excel</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;justify-content:flex-end;">
+        <select id="scheme-list" style="padding:6px 8px;border:1px solid var(--gray-light);border-radius:4px;font-size:13px;max-width:120px;"><option value="">— 选择方案 —</option></select>
+        <button class="btn-load" onclick="loadScheme()" style="font-size:12px;padding:5px 10px;">📂 加载方案</button>
+        <button class="btn btn-sm btn-generate" onclick="deleteScheme()" style="font-size:12px;padding:5px 14px;min-width:105px;">❌ 删除方案</button>
       </div>
     </div>
 
-    <div class="card">
+    </div>
+  <div class="col-partner">
+  <div class="card">
       <h2>🤝 搭档统计</h2>
       <div class="stats-grid" id="partner-stats"></div>
     </div>
+  </div>
 
+    <div class="col-coverage">
     <div class="card">
       <h2>📊 未见一览</h2>
       <div class="coverage-grid" id="coverage-grid"></div>
     </div>
   </div>
-
 </div>
+
 
 <script src="exceljs.min.js"></script>
 <script>
@@ -3062,6 +3091,7 @@ document.getElementById('gen-btn').addEventListener('click', () => {
   showLoading();
   // Defer heavy computation so the loading overlay renders first
   setTimeout(function _doGen() {
+  swapHistory = [];
   const mn = players.filter(p => p.gender === '男');
   const wn = players.filter(p => p.gender === '女');
   const M = mn.length, W = wn.length;
@@ -3181,7 +3211,23 @@ function buildGenState(M, W, matches, rounds) {
 let currentRoundCount = 5;
 let MAX_ROUNDS = 10;
 
-function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, suggestion) {
+function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion,
+ suggestion) {
+  var undoBtn = document.getElementById("undo-btn");
+  if (!undoBtn) {
+    var actionsDiv = document.getElementById("result-actions");
+    if (actionsDiv) {
+      undoBtn = document.createElement("button");
+      undoBtn.id = "undo-btn";
+      undoBtn.className = "btn btn-sm";
+      undoBtn.style.cssText = "background:var(--orange);color:#fff;display:none;";
+      undoBtn.title = "撤销上一次交换";
+      undoBtn.onclick = undoSwap;
+      undoBtn.textContent = "↩ 撤销";
+      actionsDiv.appendChild(undoBtn);
+    }
+  }
+  if (undoBtn) undoBtn.style.display = swapHistory.length > 0 ? "inline-block" : "none";
   const el = document.getElementById('result');
   el.classList.add('show');
   N = N || currentRoundCount;
@@ -3238,6 +3284,9 @@ function showResult(matches, M, W, relaxLevel, constraints, N, showSuggestion, s
 ﻿// ==================== Player swap mechanism ====================
 let _swapSelected = null;
 let _isDragging = false;
+// Swap undo history
+var swapHistory = [];
+var MAX_UNDO = 20;
 
 // makeBadge is defined inline in renderAllRounds, this is a reference
 
@@ -3245,29 +3294,43 @@ function getPlayerFromBadge(el) {
   return { gender: el.dataset.gender, player: parseInt(el.dataset.player), round: parseInt(el.dataset.round), court: parseInt(el.dataset.court), team: parseInt(el.dataset.team), pos: parseInt(el.dataset.pos) };
 }
 
+function getPlayersOnCourt(type, t1, t2) {
+  if (type === 'DB') return [{g:'M',i:t1[0]},{g:'M',i:t1[1]},{g:'M',i:t2[0]},{g:'M',i:t2[1]}];
+  if (type === 'WB') return [{g:'W',i:t1[0]},{g:'W',i:t1[1]},{g:'W',i:t2[0]},{g:'W',i:t2[1]}];
+  if (type === 'MX') return [{g:'M',i:t1[0]},{g:'W',i:t1[1]},{g:'M',i:t2[0]},{g:'W',i:t2[1]}];
+  if (type === 'XW') return [{g:'M',i:t1[0]},{g:'W',i:t1[1]},{g:'W',i:t2[0]},{g:'W',i:t2[1]}];
+  if (type === 'XD') return [{g:'M',i:t1[0]},{g:'W',i:t1[1]},{g:'M',i:t2[0]},{g:'M',i:t2[1]}];
+  if (type === 'MB') return [{g:'M',i:t1[0]},{g:'M',i:t1[1]},{g:'W',i:t2[0]},{g:'W',i:t2[1]}];
+  return [];
+}
+
+
 function computeRels(matches) {
   var partners = {}, opponents = {}, playerRounds = {};
   function incMap(map, a, b, g) { var key = g + Math.min(a,b) + "," + g + Math.max(a,b); map[key] = (map[key] || 0) + 1; }
+  function incMixed(map, m, w) { var key = 'MX' + m + ',' + w; map[key] = (map[key] || 0) + 1; }
   function addRound(key, rnd) { if (!playerRounds[key]) playerRounds[key] = {}; playerRounds[key][rnd] = true; }
   for (var mi = 0; mi < matches.length; mi++) {
     var m = matches[mi], rnd = m[0], type = m[1], t1 = m[2], t2 = m[3];
+    var pp = getPlayersOnCourt(type, t1, t2);
+    for (var pi = 0; pi < pp.length; pi++) addRound(pp[pi].g + pp[pi].i, rnd);
     if (type === "DB") {
-      addRound("M"+t1[0], rnd); addRound("M"+t1[1], rnd); addRound("M"+t2[0], rnd); addRound("M"+t2[1], rnd);
       incMap(partners, t1[0], t1[1], 'M'); incMap(partners, t2[0], t2[1], 'M');
       for (var a = 0; a < 2; a++) for (var b = 0; b < 2; b++) incMap(opponents, t1[a], t2[b], 'M');
     } else if (type === "WB") {
-      addRound("W"+t1[0], rnd); addRound("W"+t1[1], rnd); addRound("W"+t2[0], rnd); addRound("W"+t2[1], rnd);
       incMap(partners, t1[0], t1[1], 'W'); incMap(partners, t2[0], t2[1], 'W');
       for (var a = 0; a < 2; a++) for (var b = 0; b < 2; b++) incMap(opponents, t1[a], t2[b], 'W');
     } else if (type === "MX") {
-      addRound("M"+t1[0], rnd); addRound("M"+t2[0], rnd); addRound("W"+t1[1], rnd); addRound("W"+t2[1], rnd);
       incMap(opponents, t1[0], t2[0], 'M'); incMap(opponents, t1[1], t2[1], 'W');
+      incMixed(partners, t1[0], t1[1]); incMixed(partners, t2[0], t2[1]);
     } else if (type === "XW") {
-      addRound("M"+t1[0], rnd); addRound("W"+t1[1], rnd); addRound("W"+t2[0], rnd); addRound("W"+t2[1], rnd);
+      incMixed(partners, t1[0], t1[1]); incMap(partners, t2[0], t2[1], 'W');
+      for (var b = 0; b < 2; b++) { incMixed(opponents, t1[0], t2[b]); incMap(opponents, t1[1], t2[b], 'W'); }
     } else if (type === "XD") {
-      addRound("M"+t1[0], rnd); addRound("W"+t1[1], rnd); addRound("M"+t2[0], rnd); addRound("M"+t2[1], rnd);
+      incMixed(partners, t1[0], t1[1]); incMap(partners, t2[0], t2[1], 'M');
+      incMap(opponents, t1[0], t2[0], 'M'); incMap(opponents, t1[0], t2[1], 'M');
+      incMixed(opponents, t2[0], t1[1]); incMixed(opponents, t2[1], t1[1]);
     } else if (type === "MB") {
-      addRound("M"+t1[0], rnd); addRound("M"+t1[1], rnd); addRound("W"+t2[0], rnd); addRound("W"+t2[1], rnd);
       incMap(partners, t1[0], t1[1], 'M'); incMap(partners, t2[0], t2[1], 'W');
     }
   }
@@ -3305,8 +3368,15 @@ function getViolationsAfterSwap(matches, sel1, sel2) {
     var newCnt = newRels.partners[pk];
     var oldCnt = origRels.partners[pk] || 0;
     if (newCnt > 1 && newCnt > oldCnt) {
-      var parts = pk.split(",");
-      violations.push(dispNamePlain(parts[0][0], parseInt(parts[0].substring(1))) + " 与 " + dispNamePlain(parts[1][0], parseInt(parts[1].substring(1))) + " 搭档重复 (" + newCnt + "次)");
+      var msg;
+      if (pk.substring(0, 2) === 'MX') {
+        var parts = pk.substring(2).split(',');
+        msg = dispNamePlain('M', parseInt(parts[0])) + " 与 " + dispNamePlain('W', parseInt(parts[1])) + " 搭档重复 (" + newCnt + "次)";
+      } else {
+        var parts = pk.split(',');
+        msg = dispNamePlain(parts[0][0], parseInt(parts[0].substring(1))) + " 与 " + dispNamePlain(parts[1][0], parseInt(parts[1].substring(1))) + " 搭档重复 (" + newCnt + "次)";
+      }
+      violations.push(msg);
     }
   }
 
@@ -3314,8 +3384,15 @@ function getViolationsAfterSwap(matches, sel1, sel2) {
     var newCnt = newRels.opponents[ok];
     var oldCnt = origRels.opponents[ok] || 0;
     if (newCnt > 2 && newCnt > oldCnt) {
-      var op = ok.split(",");
-      violations.push(dispNamePlain(op[0][0], parseInt(op[0].substring(1))) + " 与 " + dispNamePlain(op[1][0], parseInt(op[1].substring(1))) + " 对阵过多 (" + newCnt + "次)");
+      var msg;
+      if (ok.substring(0, 2) === 'MX') {
+        var op = ok.substring(2).split(',');
+        msg = dispNamePlain('M', parseInt(op[0])) + " 与 " + dispNamePlain('W', parseInt(op[1])) + " 对阵过多 (" + newCnt + "次)";
+      } else {
+        var op = ok.split(',');
+        msg = dispNamePlain(op[0][0], parseInt(op[0].substring(1))) + " 与 " + dispNamePlain(op[1][0], parseInt(op[1].substring(1))) + " 对阵过多 (" + newCnt + "次)";
+      }
+      violations.push(msg);
     }
   }
 
@@ -3374,9 +3451,25 @@ function showSwapModal(sel1, sel2) {
   document.getElementById("swap-modal").classList.add("show");
 }
 
+function undoSwap() {
+  if (swapHistory.length === 0) return;
+  var prevMatches = swapHistory.pop();
+  if (!lastGenState) return;
+  lastGenState.matches = prevMatches;
+  var N = lastGenState.rounds || currentRoundCount;
+  renderAllRounds(prevMatches, N);
+  renderPartnerStats(prevMatches, lastGenState.M, lastGenState.W);
+  renderCoverage(prevMatches, lastGenState.M, lastGenState.W);
+  rebuildUsedSets();
+  var ub = document.getElementById("undo-btn"); if (ub) ub.style.display = swapHistory.length > 0 ? "inline-block" : "none";
+  showSuccess("\u21A9 \u5DF2\u64A4\u9500");
+}
+
 function executeSwap(sel1, sel2, newMatches) {
   document.getElementById("swap-modal").classList.remove("show");
   if (!lastGenState) return;
+  if (swapHistory.length >= MAX_UNDO) swapHistory.shift();
+  swapHistory.push(JSON.parse(JSON.stringify(lastGenState.matches)));
   lastGenState.matches = newMatches;
   var N = lastGenState.rounds || currentRoundCount;
   renderAllRounds(newMatches, N);
@@ -3384,6 +3477,7 @@ function executeSwap(sel1, sel2, newMatches) {
   renderCoverage(newMatches, lastGenState.M, lastGenState.W);
   rebuildUsedSets();
   showSuccess("\u2705 \u4ea4\u6362\u5df2\u751f\u6548");
+  var ub=document.getElementById("undo-btn");if(ub)ub.style.display=swapHistory.length>0?"inline-block":"none";
 }
 
 function rebuildUsedSets() {
@@ -3678,7 +3772,7 @@ function deleteRound(r, matches, N) {
   }
 
   hideError();
-  document.getElementById('success-msg').textContent = '🗑️ 已删除第 ' + (r + 1) + ' 轮,剩余 ' + newN + ' 轮';
+  document.getElementById('success-msg').textContent = '🗑 删除方案️ 已删除第 ' + (r + 1) + ' 轮,剩余 ' + newN + ' 轮';
   document.getElementById('success-msg').classList.add('show');
   document.getElementById('round-counter').textContent = newN + '/' + MAX_ROUNDS;
   document.getElementById('add-round-btn').style.display = newN < MAX_ROUNDS ? 'inline-block' : 'none';
@@ -4259,14 +4353,8 @@ function renderPartnerStats(matches, M, W) {
   function addMet(p1, p2) { if (p1 !== p2) met.add(pairKey(p1, p2)); }
   for (const m of matches) {
     const [r, type, t1, t2] = m;
-    var pp = [];
-    if (type === 'DB') { pp = ['M'+t1[0],'M'+t1[1],'M'+t2[0],'M'+t2[1]]; }
-    else if (type === 'WB') { pp = ['W'+t1[0],'W'+t1[1],'W'+t2[0],'W'+t2[1]]; }
-    else if (type === 'MX') { pp = ['M'+t1[0],'W'+t1[1],'M'+t2[0],'W'+t2[1]]; }
-    else if (type === 'XW') { pp = ['M'+t1[0],'W'+t1[1],'W'+t2[0],'W'+t2[1]]; }
-    else if (type === 'XD') { pp = ['M'+t1[0],'W'+t1[1],'M'+t2[0],'M'+t2[1]]; }
-    else if (type === 'MB') { pp = ['M'+t1[0],'M'+t1[1],'W'+t2[0],'W'+t2[1]]; }
-    for (var a = 0; a < pp.length; a++) for (var b = a + 1; b < pp.length; b++) addMet(pp[a], pp[b]);
+    var pp = getPlayersOnCourt(type, t1, t2);
+    for (var a = 0; a < pp.length; a++) for (var b = a + 1; b < pp.length; b++) addMet(pp[a].g + pp[a].i, pp[b].g + pp[b].i);
   }
   function fmtTag(g, i) { return '<span class="tag tag-' + (g === 'M' ? 'm' : 'f') + '">' + nameOf(g, i) + '</span>'; }
   var cards = [];
@@ -4317,6 +4405,7 @@ document.getElementById('add-round-btn')?.addEventListener('click', function() {
   showLoading();
   // Defer heavy computation so the loading overlay renders first
   setTimeout(function _doAddRound() {
+  swapHistory = [];
 
   const { M, W, matches: existing, usedDB, usedWB, usedMX, mc, fc, rounds } = lastGenState;
   const newRoundIdx = rounds;
@@ -4724,4 +4813,62 @@ function exportToExcel(matches, M, W, maleNamesRef, femaleNamesRef) {
     showError('导出失败：' + err.message);
   });
 }
+
+function getSchemes() {
+  try { return JSON.parse(localStorage.getItem("tennis_saved_schemes")) || []; } catch(e) { return []; }
+}
+function saveSchemes(arr) {
+  localStorage.setItem("tennis_saved_schemes", JSON.stringify(arr));
+}
+function refreshSchemeList() {
+  var sel = document.getElementById("scheme-list"); if (!sel) return;
+  var schemes = getSchemes();
+  sel.innerHTML = "<option value=\"\">\u2014 \u9009\u62E9\u65B9\u6848 \u2014</option>";
+  for (var si = 0; si < schemes.length; si++) {
+    var opt = document.createElement("option"); opt.value = schemes[si].name; opt.textContent = schemes[si].name; sel.appendChild(opt);
+  }
+}
+function saveScheme() {
+  if (!lastGenState || !lastGenState.matches || lastGenState.matches.length === 0) { showError("\u8BF7\u5148\u751F\u6210\u6392\u9635"); return; }
+  var name = (document.getElementById("scheme-name").value || "").trim();
+  if (!name) { showError("\u8BF7\u8F93\u5165\u65B9\u6848\u540D\u79F0"); return; }
+  var schemes = getSchemes();
+  for (var si = 0; si < schemes.length; si++) {
+    if (schemes[si].name === name) {
+      if (!confirm("\u65B9\u6848\u201C" + name + "\u201D\u5DF2\u5B58\u5728\uFF0C\u662F\u5426\u8986\u76D6\uFF1F")) return;
+      schemes.splice(si, 1); break;
+    }
+  }
+  schemes.push({name: name, matches: JSON.parse(JSON.stringify(lastGenState.matches)), usedDB: new Set(lastGenState.usedDB), usedWB: new Set(lastGenState.usedWB), usedMX: new Set(lastGenState.usedMX), mc: lastGenState.mc.slice(), fc: lastGenState.fc.slice(), M: lastGenState.M, W: lastGenState.W, rounds: lastGenState.rounds});
+  saveSchemes(schemes); refreshSchemeList();
+  var msg = document.getElementById("success-msg"); msg.textContent = "\u2705 \u65B9\u6848\u201C" + name + "\u201D\u5DF2\u4FDD\u5B58"; msg.classList.add("show");
+  setTimeout(function(){ msg.classList.remove("show"); }, 2000);
+}
+function loadScheme() {
+  swapHistory = [];
+  var sel = document.getElementById("scheme-list");
+  if (!sel || !sel.value) { showError("\u8BF7\u9009\u62E9\u8981\u52A0\u8F7D\u7684\u65B9\u6848"); return; }
+  var schemes = getSchemes(); var found = null;
+  for (var si = 0; si < schemes.length; si++) { if (schemes[si].name === sel.value) { found = schemes[si]; break; } }
+  if (!found) { showError("\u65B9\u6848\u4E0D\u5B58\u5728"); return; }
+  lastGenState.matches = JSON.parse(JSON.stringify(found.matches));
+  lastGenState.usedDB = new Set(found.usedDB); lastGenState.usedWB = new Set(found.usedWB); lastGenState.usedMX = new Set(found.usedMX);
+  lastGenState.mc = found.mc.slice(); lastGenState.fc = found.fc.slice();
+  lastGenState.M = found.M; lastGenState.W = found.W; lastGenState.rounds = found.rounds;
+  renderAllRounds(lastGenState.matches, lastGenState.rounds);
+  renderPartnerStats(lastGenState.matches, lastGenState.M, lastGenState.W);
+  renderCoverage(lastGenState.matches, lastGenState.M, lastGenState.W);
+  var msg = document.getElementById("success-msg"); msg.textContent = "\u2705 \u65B9\u6848\u201C" + found.name + "\u201D\u5DF2\u52A0\u8F7D"; msg.classList.add("show");
+  setTimeout(function(){ msg.classList.remove("show"); }, 2000);
+}
+function deleteScheme() {
+  var sel = document.getElementById("scheme-list");
+  if (!sel || !sel.value) { showError("\u8BF7\u9009\u62E9\u8981\u5220\u9664\u7684\u65B9\u6848"); return; }
+  if (!confirm("\u786E\u5B9A\u5220\u9664\u65B9\u6848\u201C" + sel.value + "\u201D\uFF1F")) return;
+  var schemes = getSchemes();
+  for (var si = 0; si < schemes.length; si++) { if (schemes[si].name === sel.value) { schemes.splice(si, 1); break; } }
+  saveSchemes(schemes); refreshSchemeList();
+}
+refreshSchemeList();
+
 </script></body></html>
