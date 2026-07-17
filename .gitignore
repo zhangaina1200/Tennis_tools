@@ -37,3 +37,10 @@ fix_*.txt
 todo.md
 _debug_*.*
 *.xlsx
+
+# Temp & debug files
+.github/
+old_fn.txt
+_debug_*.txt
+fix_*.py
+todo.md
