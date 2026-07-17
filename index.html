@@ -4182,6 +4182,12 @@ function gatherSaveData() {
   return {players: pData, constraints: consData, mode: mode, minDB: minDB, minWB: minWB, minMX: minMX, date: dateVal, time: timeVal, version: 1};
 }
 
+function autoSave() {
+  try {
+    var data = gatherSaveData(); localStorage.setItem("tennis_schedule_data", JSON.stringify(data));
+  } catch(e) {}
+}
+
 function saveToLocal() {
   try {
     var data = gatherSaveData();
@@ -4250,6 +4256,7 @@ function loadFromLocal() {
       // Re-render constraints
       renderPairConList();
       renderFixedConList();
+      refreshConstraintSelects();
     }
 
     document.getElementById('success-msg').textContent = '✅ 已加载本地数据！（' + data.players.length + '人）';
@@ -4840,7 +4847,7 @@ function saveScheme() {
       schemes.splice(si, 1); break;
     }
   }
-  schemes.push({name: name, matches: JSON.parse(JSON.stringify(lastGenState.matches)), usedDB: new Set(lastGenState.usedDB), usedWB: new Set(lastGenState.usedWB), usedMX: new Set(lastGenState.usedMX), mc: lastGenState.mc.slice(), fc: lastGenState.fc.slice(), M: lastGenState.M, W: lastGenState.W, rounds: lastGenState.rounds});
+  schemes.push({name: name, matches: JSON.parse(JSON.stringify(lastGenState.matches)), usedDB: [...lastGenState.usedDB], usedWB: [...lastGenState.usedWB], usedMX: [...lastGenState.usedMX], mc: lastGenState.mc.slice(), fc: lastGenState.fc.slice(), M: lastGenState.M, W: lastGenState.W, rounds: lastGenState.rounds});
   saveSchemes(schemes); refreshSchemeList();
   var msg = document.getElementById("success-msg"); msg.textContent = "\u2705 \u65B9\u6848\u201C" + name + "\u201D\u5DF2\u4FDD\u5B58"; msg.classList.add("show");
   setTimeout(function(){ msg.classList.remove("show"); }, 2000);
@@ -4853,7 +4860,7 @@ function loadScheme() {
   for (var si = 0; si < schemes.length; si++) { if (schemes[si].name === sel.value) { found = schemes[si]; break; } }
   if (!found) { showError("\u65B9\u6848\u4E0D\u5B58\u5728"); return; }
   lastGenState.matches = JSON.parse(JSON.stringify(found.matches));
-  lastGenState.usedDB = new Set(found.usedDB); lastGenState.usedWB = new Set(found.usedWB); lastGenState.usedMX = new Set(found.usedMX);
+  lastGenState.usedDB = new Set(Array.isArray(found.usedDB)?found.usedDB:[]); lastGenState.usedWB = new Set(Array.isArray(found.usedWB)?found.usedWB:[]); lastGenState.usedMX = new Set(Array.isArray(found.usedMX)?found.usedMX:[]);
   lastGenState.mc = found.mc.slice(); lastGenState.fc = found.fc.slice();
   lastGenState.M = found.M; lastGenState.W = found.W; lastGenState.rounds = found.rounds;
   renderAllRounds(lastGenState.matches, lastGenState.rounds);
