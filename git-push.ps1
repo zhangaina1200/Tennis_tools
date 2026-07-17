@@ -32,7 +32,7 @@ if (Test-Path "$repoPath\.git\index.lock") {
     Remove-Item "$repoPath\.git\index.lock" -Force -ErrorAction SilentlyContinue
 }
 
-# 4. Stage specific files
+# 4. Stage
 Write-Host "`n=== Staging ===" -ForegroundColor Cyan
 git add index.html .gitignore git-push.ps1 2>$null
 Write-Host "Staged: index.html, .gitignore, git-push.ps1"
@@ -41,11 +41,11 @@ Write-Host "Staged: index.html, .gitignore, git-push.ps1"
 Write-Host "`n=== Committing ===" -ForegroundColor Cyan
 git commit -m $Message 2>$null
 
-# 6. Push
+# 6. Push (with 5s timeout for low-speed detection)
 Write-Host "`n=== Pushing ===" -ForegroundColor Cyan
-git push origin master 2>$null
+git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=5 push origin master 2>$null
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nOK - pushed!" -ForegroundColor Green
 } else {
-    Write-Host "`nPush blocked (network). Run: git push origin master" -ForegroundColor Yellow
+    Write-Host "`nNetwork unavailable. Run: git push origin master" -ForegroundColor Yellow
 }
